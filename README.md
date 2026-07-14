@@ -88,19 +88,25 @@ Automated-Recon-Framework/
 ├── requirements.txt
 │
 ├── modules/
-│   ├── input_module.py
-│   ├── subdomain.py
-│   ├── http_probe.py
-│   ├── port_scan.py
-│   ├── report.py
-│   ├── screenshots.py
-|   └── javascript.py
+│   ├── __init__.py
+│   ├── http_probe.py
+│   ├── input_module.py
+│   ├── javascript.py
+│   ├── port_scan.py
+│   ├── report.py
+│   ├── screenshots.py
+│   └── subdomain.py
 │
 ├── reports/
 │
 ├── tools/
 │
-├── utils/
+├── utils
+|   ├── __init__.py
+|   ├── banner.py
+|   ├── helpers.py
+|   ├── logger.py
+|   └── validator.py
 │
 └── README.md
 ```
@@ -112,7 +118,7 @@ Automated-Recon-Framework/
 Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/ReconFramework.git
+git clone https://github.com/A-run_17/Automated-Recon-Framework.git
 ```
 
 Navigate to the project
