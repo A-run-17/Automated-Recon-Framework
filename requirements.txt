@@ -1,0 +1,30 @@
+# Automated Recon Framework — Python dependencies
+#
+# This project intentionally has ZERO third-party Python package
+# dependencies. Every module (config.py, modules/, utils/) is built on
+# the standard library only: argparse, subprocess, pathlib, dataclasses,
+# concurrent.futures, json, logging, urllib, xml.etree.ElementTree, etc.
+#
+# `pip install -r requirements.txt` will therefore install nothing —
+# that's expected, not a mistake. This file exists so the install
+# instructions stay standard/familiar and so future optional Python
+# dependencies have a clear place to be pinned.
+
+# (no third-party packages required)
+
+
+# ------------------------------------------------------------------
+# External tool dependencies (NOT pip packages — install separately)
+# ------------------------------------------------------------------
+# The framework orchestrates these CLI tools via subprocess. Each stage
+# is skipped with a warning if its tool isn't installed, so the
+# framework runs immediately and gains capability as you add tools.
+#
+#   subfinder    -> go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+#   httpx        -> go install github.com/projectdiscovery/httpx/cmd/httpx@latest
+#   assetfinder  -> go install github.com/tomnomnom/assetfinder@latest
+#   gowitness    -> go install github.com/sensepost/gowitness@latest
+#   amass        -> go install -v github.com/owasp-amass/amass/v4/...@master
+#   nmap         -> apt install nmap / brew install nmap
+#
+# See README.md for full installation details.
