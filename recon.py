@@ -13,7 +13,7 @@ targets you own or have explicit written permission to test.
 from __future__ import annotations
 
 import sys
-sys.dont_write_bytecode = True
+sys.dont_write_bytecode = True # To avoid the accumulation of pychache
 
 import argparse
 import logging
