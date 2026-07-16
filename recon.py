@@ -12,9 +12,11 @@ targets you own or have explicit written permission to test.
 
 from __future__ import annotations
 
+import sys
+sys.dont_write_bytecode = True
+
 import argparse
 import logging
-import sys
 import time
 
 from config import load_config
