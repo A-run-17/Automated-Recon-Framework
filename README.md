@@ -36,7 +36,7 @@ A modular Python reconnaissance framework for authorized security testing and bu
 
 ```bash
 # Clone the repository
-git clone git@github.com:<your-username>/Automated-Recon-Framework.git
+git clone https://github.com/A-run-17/Automated-Recon-Framework.git
 
 # Navigate into the project directory
 cd Automated-Recon-Framework
