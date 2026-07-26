@@ -24,7 +24,7 @@ from modules.http_probe import probe_hosts
 from modules.input_module import prepare_scan
 from modules.javascript import analyze_hosts
 from modules.port_scan import scan_ports
-from modules.report import build_summary, generate_all_reports
+from modules.report import build_summary, generate_report
 from modules.screenshots import capture_screenshots
 from modules.subdomain import enumerate_subdomains
 
@@ -171,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
             js_findings=js_findings,
             screenshot_hosts=screenshot_hosts,
         )
-        generate_all_reports(summary, scan.report_dir)
+        generate_report(summary, scan.report_dir)
 
     logger.info("Scan complete in %.1fs", duration)
     logger.info("Results saved to %s", scan.report_dir)
