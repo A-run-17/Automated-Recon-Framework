@@ -1,15 +1,15 @@
-"""
-ASCII startup banner for the Recon Framework."""
+""" ASCII startup banner for the Recon Framework. """
 
 from __future__ import annotations
 
 _BANNER = r"""
- ____
-|  _ \ ___  ___ ___  _ __
-| |_) / _ \/ __/ _ \| '_ \
-|  _ <  __/ (_| (_) | | | |
-|_| \_\___|\___\___/|_| |_|
-   Automated Recon Framework
+  _____                     
+ / ___ \                   
+ | |_/ /___  ___ ___  _ __  
+ |    // _ \/ __/ _ \| '_ \ 
+ | |\ \  __/ (_| (_) | | | | 
+ \_| \_\___|\___\___/|_| |_|
+     Automated Recon Framework
 """
 
 _VERSION = "0.1.1"
