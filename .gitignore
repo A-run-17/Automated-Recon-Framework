@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Scan output
+reports/*
+!reports/.gitkeep
+
+# Screenshots
+screenshots/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
