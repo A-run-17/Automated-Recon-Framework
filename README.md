@@ -2,11 +2,9 @@
 
 A modular Python reconnaissance framework for authorized security testing and bug bounty hunting. Orchestrates industry-standard recon tools behind a single CLI and produces structured HTML, JSON, and Markdown reports.
 
-> **Authorized use only.** Only scan targets you own or have explicit written permission to test.
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
-![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-green)
-![License](https://img.shields.io/badge/License-MIT-orange)
+![Python](https://img.shields.io/badge/Python-3.11+-orange.svg)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Features
 
@@ -42,26 +40,26 @@ git clone https://github.com/A-run-17/Automated-Recon-Framework.git
 cd Automated-Recon-Framework
 
 # Install dependencies
-pip install -r requirements.txt
+chmod +x install.sh
 
-# Run the tool
-python3 recon.py example.com
+# Restart the terminal and Run the tool
+recon example.com
 ```
 
-> The `pip install` step completes instantly and installs nothing — the framework is built entirely on Python's standard library. Install the external tools above separately for full functionality.
+> Follow as instructed after running the `install.sh` file and restart the terminal. Then run the `recon` command at the desired directory for reports.
 
 ## Usage
 
 ```bash
-python3 recon.py example.com                # run all stages (default)
-python3 recon.py example.com --full          # explicit full scan
-python3 recon.py example.com --subdomains    # subdomain enumeration only
-python3 recon.py example.com --http          # HTTP probing only
-python3 recon.py example.com --ports         # port scanning only
-python3 recon.py example.com --javascript    # JavaScript analysis only
-python3 recon.py example.com --screenshots   # screenshots only
-python3 recon.py example.com --report        # regenerate reports only
-python3 recon.py example.com --threads 50 --timeout 20
+recon example.com                 # run all stages (default)
+recon example.com --full          # explicit full scan
+recon example.com --subdomains    # subdomain enumeration only
+recon example.com --http          # HTTP probing only
+recon example.com --ports         # port scanning only
+recon example.com --javascript    # JavaScript analysis only
+recon example.com --screenshots   # screenshots only
+recon example.com --report        # regenerate reports only
+recon example.com --threads 50 --timeout 20
 ```
 
 Accepted targets: domains, URLs, IPv4/IPv6 addresses, and CIDR ranges. Subdomain enumeration runs only for domain targets.
@@ -81,18 +79,20 @@ reports/
         ├── javascript.json
         ├── screenshots/
         ├── scan.log
-        └── report.html / report.json / report.md
+        └── report.html 
 ```
 
 ## Project Structure
 
 ```
 Automated-Recon-Framework/
-├── recon.py              # CLI entry point
-├── config.py              # Central configuration
+├── recon.py                # CLI entry point
+├── config.py               # Central configuration
 ├── requirements.txt
+├── install.sh              # Installing dependencies
+├── installation.md         # Detailed manual instructions for installing (.gitignored)
 ├── modules/
-│   ├── input_module.py    # Target validation, scan setup
+│   ├── input_module.py     # Target validation, scan setup
 │   ├── subdomain.py        # Subfinder / Amass / Assetfinder
 │   ├── http_probe.py       # httpx liveness + tech detection
 │   ├── port_scan.py        # Nmap service/version scanning
@@ -105,7 +105,7 @@ Automated-Recon-Framework/
 │   ├── helpers.py
 │   └── banner.py
 ├── tools/                  # Optional bundled tools / wordlists
-└── reports/                # Scan output (gitignored)
+└── reports/                # Sample output (.gitignored)
 ```
 
 ---
