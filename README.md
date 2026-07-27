@@ -1,6 +1,6 @@
 # Automated Recon Framework CLI
 
-A modular Python reconnaissance framework for authorized security testing and bug bounty hunting. Orchestrates industry-standard recon tools behind a single CLI and produces structured HTML, JSON, and Markdown reports.
+A modular Python reconnaissance framework for authorized security testing and bug bounty hunting. Orchestrates industry-standard recon tools behind a single CLI and produces structured HTML, JSON.
 
 
 ![Python](https://img.shields.io/badge/Python-3.11+-orange.svg)
@@ -113,7 +113,6 @@ Automated-Recon-Framework/
 ## Project Goals
 
 - Build a production-quality reconnaissance framework
-- Learn software architecture through a real-world cybersecurity project
 - Automate repetitive reconnaissance tasks
 - Create a tool useful for bug bounty hunting and penetration testing
 - Maintain clean, modular, and well-documented code
