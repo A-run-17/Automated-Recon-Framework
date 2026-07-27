@@ -12,9 +12,6 @@ env/
 .vscode/
 .idea/
 
-# Scan output
-reports/*
-!reports/.gitkeep
 
 # Screenshots
 screenshots/
@@ -25,4 +22,8 @@ screenshots/
 # Temporary files
 *.tmp
 
+# Installation Steps
 installation.md
+
+# Sample Reports
+reports/
