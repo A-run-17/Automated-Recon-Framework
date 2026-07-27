@@ -1,4 +1,4 @@
-# Automated Recon Framework
+# Automated Recon Framework CLI
 
 A modular Python reconnaissance framework for authorized security testing and bug bounty hunting. Orchestrates industry-standard recon tools behind a single CLI and produces structured HTML, JSON, and Markdown reports.
 
