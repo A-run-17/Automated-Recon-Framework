@@ -162,106 +162,6 @@ def _embed_screenshots(report_dir: Path) -> list[dict[str, str]]:
 
     return embedded
 
-'''
-def generate_json_report(summary: ScanSummary, report_dir: Path) -> Path:
-    """Write the scan summary as ``report.json``.
-
-    Args:
-        summary: The scan summary to serialize.
-        report_dir: Directory to write the report into.
-
-    Returns:
-        Path to the written JSON report.
-    """
-    output_path = report_dir / "report.json"
-    payload = _to_plain(summary)
-    payload["statistics"] = summary.statistics
-    write_json(output_path, payload)
-    return output_path
-
-
-def generate_markdown_report(summary: ScanSummary, report_dir: Path) -> Path:
-    """Write the scan summary as ``report.md``.
-
-    Args:
-        summary: The scan summary to render.
-        report_dir: Directory to write the report into.
-
-    Returns:
-        Path to the written Markdown report.
-    """
-    stats = summary.statistics
-    lines: list[str] = [
-        f"# Recon Report: {summary.target}",
-        "",
-        f"- **Scan ID:** {summary.scan_id}",
-        f"- **Duration:** {format_duration(summary.duration_seconds)}",
-        "",
-        "## Statistics",
-        "",
-    ]
-    for key, value in stats.items():
-        lines.append(f"- **{key.replace('_', ' ').title()}:** {value}")
-
-    lines += ["", "## Subdomains", ""]
-    if summary.subdomains:
-        lines += [f"- {s}" for s in summary.subdomains]
-    else:
-        lines.append("_No subdomains found._")
-
-    lines += ["", "## Alive Hosts", ""]
-    if summary.alive_hosts:
-        lines.append("| URL | Status | Title | Web Server |")
-        lines.append("|---|---|---|---|")
-        for h in summary.alive_hosts:
-            lines.append(f"| {h.url} | {h.status_code} | {h.title} | {h.webserver} |")
-    else:
-        lines.append("_No alive hosts found._")
-
-    lines += ["", "## Open Ports", ""]
-    if summary.port_results:
-        for host_result in summary.port_results:
-            lines.append(f"### {host_result.host}")
-            if host_result.os_guess:
-                lines.append(f"- OS guess: {host_result.os_guess}")
-            if host_result.ports:
-                lines.append("| Port | Protocol | Service | Product/Version |")
-                lines.append("|---|---|---|---|")
-                for port in host_result.ports:
-                    prod = f"{port.product} {port.version}".strip()
-                    lines.append(f"| {port.port} | {port.protocol} | {port.service} | {prod} |")
-            else:
-                lines.append("_No open ports found._")
-            lines.append("")
-    else:
-        lines.append("_No hosts were port scanned._")
-
-    lines += ["", "## JavaScript Findings", ""]
-    if summary.js_findings:
-        for finding in summary.js_findings:
-            lines.append(f"### {finding.source_url}")
-            if finding.endpoints:
-                lines.append(f"- Endpoints found: {len(finding.endpoints)}")
-            if finding.urls:
-                lines.append(f"- URLs found: {len(finding.urls)}")
-            if finding.secrets:
-                lines.append(f"- **Possible secrets:** {', '.join(finding.secrets.keys())}")
-            lines.append("")
-    else:
-        lines.append("_No JavaScript findings._")
-
-    lines += ["", "## Screenshots", ""]
-    if summary.screenshot_hosts:
-        lines.append(f"Screenshots captured for {len(summary.screenshot_hosts)} host(s), "
-                      "stored in the `screenshots/` directory.")
-    else:
-        lines.append("_No screenshots captured._")
-
-    output_path = report_dir / "report.md"
-    output_path.write_text("\n".join(lines), encoding="utf-8")
-    return output_path
-'''
-
 def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
     """Generate a single, self-contained HTML report for a scan.
 
@@ -292,10 +192,20 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
         "possible_secrets_found": "Possible Secrets",
         "screenshots_captured": "Screenshots",
     }
+    stat_anchors = {
+        "subdomains_found": "#subdomains",
+        "alive_hosts": "#alive-hosts",
+        "hosts_port_scanned": "#open-ports",
+        "open_ports_found": "#open-ports",
+        "js_files_analyzed": "#js-findings",
+        "possible_secrets_found": "#js-findings",
+        "screenshots_captured": "#screenshots",
+    }
     stat_cards = "".join(
-        f'<div class="stat-card{" stat-alert" if key == "possible_secrets_found" and value else ""}">'
+        f'<a class="stat-card{" stat-alert" if key == "possible_secrets_found" and value else ""}" '
+        f'href="{stat_anchors.get(key, "#overview")}">'
         f'<div class="stat-value">{value}</div>'
-        f'<div class="stat-label">{e(stat_labels.get(key, key))}</div></div>'
+        f'<div class="stat-label">{e(stat_labels.get(key, key))}</div></a>'
         for key, value in stats.items()
     )
 
@@ -347,7 +257,8 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
 
             os_line = f'<p class="os-guess">OS guess: {e(host_result.os_guess)}</p>' if host_result.os_guess else ""
             port_sections += (
-                f'<details class="host-block" open><summary>{e(host_result.host)} '
+                f'<details class="host-block" data-filter="{e(host_result.host.lower())}">'
+                f'<summary>{e(host_result.host)} '
                 f'<span class="count-pill">{len(host_result.ports)} open</span></summary>'
                 f"{os_line}{port_table}</details>"
             )
@@ -380,17 +291,21 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
     else:
         js_table = '<p class="empty">No JavaScript findings.</p>'
 
-    # ---- Screenshot gallery (fully embedded, no external files) -----------
+    # ---- Screenshot slideshow (fully embedded, no external files) ---------
     if screenshots:
-        gallery_items = "".join(
-            f'<a class="gallery-item" href="{shot["data_uri"]}" target="_blank" rel="noopener noreferrer">'
-            f'<img src="{shot["data_uri"]}" alt="{e(shot["name"])}" loading="lazy">'
-            f'<span class="gallery-caption">{e(shot["name"])}</span></a>'
-            for shot in screenshots
-        )
-        gallery = f'<div class="gallery">{gallery_items}</div>'
+        gallery = f"""<div class="slideshow">
+      <div class="slide-viewport">
+        <button class="slide-nav prev" onclick="changeSlide(-1)" aria-label="Previous screenshot">&#10094;</button>
+        <img id="slide-image" src="{screenshots[0]['data_uri']}" alt="{e(screenshots[0]['name'])}">
+        <button class="slide-nav next" onclick="changeSlide(1)" aria-label="Next screenshot">&#10095;</button>
+        <div class="slide-counter"><span id="slide-index">1</span> / {len(screenshots)}</div>
+      </div>
+      <div class="slide-caption" id="slide-caption">{e(screenshots[0]['name'])}</div>
+      <div class="slide-dots" id="slide-dots"></div>
+    </div>"""
     else:
         gallery = '<p class="empty">No screenshots captured.</p>'
+    screenshot_json = json.dumps(screenshots)
 
     # ---- Embedded raw data (for anyone who wants to script against it) -----
     raw_payload = _to_plain(summary)
@@ -405,39 +320,83 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
 <title>Recon Report — {e(summary.target)}</title>
 <style>
   :root {{
-    --bg: #0f1420;
-    --surface: #161d2e;
-    --surface-alt: #1d2740;
-    --border: #2a3550;
-    --text: #e6ebf5;
-    --text-dim: #93a1c2;
-    --accent: #4f8cff;
-    --ok: #2ecc71;
-    --redirect: #f1c40f;
-    --client-error: #e67e22;
-    --server-error: #e74c3c;
-    --danger: #e74c3c;
-    --safe: #2ecc71;
-    --radius: 10px;
+    --bg: #060a08;
+    --surface: #0b120d;
+    --surface-alt: #101a13;
+    --border: #1e3a26;
+    --border-bright: #00ff7f;
+    --text: #c9ffd6;
+    --text-dim: #5d8a6b;
+    --accent: #00ff7f;
+    --accent-glow: rgba(0, 255, 127, 0.35);
+    --ok: #00ff7f;
+    --redirect: #ffe066;
+    --client-error: #ff9f43;
+    --server-error: #ff5c5c;
+    --danger: #ff5c5c;
+    --safe: #00ff7f;
+    --radius: 6px;
+    --mono: "Consolas", "SFMono-Regular", "Courier New", monospace;
   }}
   * {{ box-sizing: border-box; }}
+  html {{ scroll-behavior: smooth; }}
   body {{
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    line-height: 1.5;
+    font-family: var(--mono);
+    line-height: 1.55;
+    position: relative;
   }}
-  .wrap {{ max-width: 1100px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }}
-  header.top {{
-    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-    border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 2rem;
+  body::before {{
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999;
+    background: repeating-linear-gradient(0deg, rgba(0,255,127,0.025) 0px, rgba(0,255,127,0.025) 1px, transparent 1px, transparent 3px);
   }}
-  header.top h1 {{ margin: 0; font-size: 1.7rem; font-weight: 700; }}
-  header.top .meta {{ color: var(--text-dim); font-size: 0.9rem; }}
+  .wrap {{ max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }}
+  section {{ scroll-margin-top: 4.5rem; }}
+
+  /* Terminal-style header */
+  .term-window {{
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem;
+    box-shadow: 0 0 30px rgba(0, 255, 127, 0.06);
+  }}
+  .term-bar {{
+    background: #0d1710; padding: 0.55rem 0.9rem; display: flex; align-items: center; gap: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }}
+  .term-dot {{ width: 10px; height: 10px; border-radius: 50%; display: inline-block; }}
+  .term-dot.red {{ background: #ff5f56; }}
+  .term-dot.yellow {{ background: #ffbd2e; }}
+  .term-dot.green {{ background: #27c93f; }}
+  .term-title {{ margin-left: 0.6rem; color: var(--text-dim); font-size: 0.78rem; }}
+  .term-body {{ padding: 1.15rem 1.4rem; }}
+  .term-body h1 {{
+    margin: 0; font-size: 1.35rem; font-weight: 700; display: flex; align-items: baseline;
+    gap: 0.4rem; flex-wrap: wrap;
+  }}
+  .prompt {{ color: var(--accent); }}
+  .prompt-sep, .prompt-path {{ color: var(--text-dim); }}
+  .target-name {{ color: var(--text); }}
+  .cursor {{ display: inline-block; width: 0.5em; color: var(--accent); animation: blink 1s steps(1) infinite; }}
+  @keyframes blink {{ 50% {{ opacity: 0; }} }}
+  .meta {{ color: var(--text-dim); font-size: 0.82rem; margin-top: 0.4rem; }}
+
+  /* Quick nav */
+  .quick-nav {{
+    position: sticky; top: 0.75rem; z-index: 10; display: flex; flex-wrap: wrap; gap: 0.25rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.5rem; margin-bottom: 2rem;
+  }}
+  .quick-nav a {{
+    color: var(--text-dim); text-decoration: none; font-size: 0.76rem; padding: 0.3rem 0.6rem;
+    border-radius: 4px; transition: background 0.15s, color 0.15s;
+  }}
+  .quick-nav a::before {{ content: "#"; margin-right: 0.15rem; opacity: 0.6; }}
+  .quick-nav a:hover {{ color: var(--bg); background: var(--accent); }}
+
   h2 {{
-    font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.05em;
-    color: var(--text-dim); margin: 2.5rem 0 1rem; font-weight: 600;
+    font-size: 1rem; letter-spacing: 0.03em; color: var(--accent); margin: 2.25rem 0 1rem;
+    font-weight: 600; border-left: 3px solid var(--accent); padding-left: 0.6rem;
   }}
   .stat-grid {{
     display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -445,95 +404,172 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
   }}
   .stat-card {{
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 1rem; text-align: center;
+    padding: 1rem; text-align: center; text-decoration: none; color: inherit; display: block;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; cursor: pointer;
   }}
-  .stat-card.stat-alert {{ border-color: var(--danger); background: rgba(231, 76, 60, 0.08); }}
+  .stat-card:hover {{ transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 0 18px var(--accent-glow); }}
+  .stat-card.stat-alert {{ border-color: var(--danger); background: rgba(255, 92, 92, 0.08); }}
   .stat-value {{ font-size: 1.6rem; font-weight: 700; }}
-  .stat-label {{ font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.25rem; }}
+  .stat-label {{ font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.25rem; }}
 
-  input#subdomain-filter {{
+  input[type="text"] {{
     width: 100%; padding: 0.6rem 0.9rem; border-radius: var(--radius); border: 1px solid var(--border);
-    background: var(--surface); color: var(--text); font-size: 0.9rem; margin-bottom: 0.85rem;
+    background: var(--surface); color: var(--text); font-size: 0.85rem; font-family: var(--mono);
   }}
+  input[type="text"]:focus {{ outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }}
+
+  /* Contained scroll panels so long lists don't push the whole page down */
+  .scroll-panel {{
+    max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 0.85rem; background: var(--surface);
+  }}
+  .scroll-panel::-webkit-scrollbar {{ width: 8px; }}
+  .scroll-panel::-webkit-scrollbar-track {{ background: var(--surface); }}
+  .scroll-panel::-webkit-scrollbar-thumb {{ background: var(--border-bright); border-radius: 4px; opacity: 0.5; }}
+
+  .panel-toolbar {{ display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 0.75rem; }}
+  .panel-toolbar input {{ flex: 1; min-width: 200px; margin-bottom: 0; }}
+  .toolbar-buttons {{ display: flex; gap: 0.4rem; }}
+  .btn-term {{
+    background: var(--surface-alt); border: 1px solid var(--border); color: var(--accent);
+    padding: 0.45rem 0.8rem; border-radius: 4px; font-family: var(--mono); font-size: 0.75rem;
+    cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; white-space: nowrap;
+  }}
+  .btn-term:hover {{ border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }}
+
+  #subdomain-filter {{ margin-bottom: 0.85rem; }}
   .chip-grid {{ display: flex; flex-wrap: wrap; gap: 0.5rem; }}
   .chip {{
     display: inline-block; padding: 0.35rem 0.75rem; background: var(--surface-alt);
     border: 1px solid var(--border); border-radius: 999px; color: var(--accent);
-    text-decoration: none; font-size: 0.85rem; transition: border-color 0.15s;
+    text-decoration: none; font-size: 0.82rem; transition: border-color 0.15s;
   }}
-  .chip:hover {{ border-color: var(--accent); }}
+  .chip:hover {{ border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }}
 
   table {{ width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; }}
-  th, td {{ padding: 0.6rem 0.85rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border); }}
-  th {{ background: var(--surface-alt); color: var(--text-dim); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.04em; }}
+  th, td {{ padding: 0.6rem 0.85rem; text-align: left; font-size: 0.85rem; border-bottom: 1px solid var(--border); }}
+  th {{ background: var(--surface-alt); color: var(--text-dim); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.04em; }}
   tr:last-child td {{ border-bottom: none; }}
   td a {{ color: var(--accent); text-decoration: none; word-break: break-all; }}
   td a:hover {{ text-decoration: underline; }}
 
-  .badge {{ padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }}
-  .badge-ok {{ background: rgba(46, 204, 113, 0.15); color: var(--ok); }}
-  .badge-redirect {{ background: rgba(241, 196, 15, 0.15); color: var(--redirect); }}
-  .badge-client-error {{ background: rgba(230, 126, 34, 0.15); color: var(--client-error); }}
-  .badge-server-error {{ background: rgba(231, 76, 60, 0.15); color: var(--server-error); }}
-  .badge-unknown {{ background: rgba(147, 161, 194, 0.15); color: var(--text-dim); }}
+  .badge {{ padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }}
+  .badge-ok {{ background: rgba(0, 255, 127, 0.15); color: var(--ok); }}
+  .badge-redirect {{ background: rgba(255, 224, 102, 0.15); color: var(--redirect); }}
+  .badge-client-error {{ background: rgba(255, 159, 67, 0.15); color: var(--client-error); }}
+  .badge-server-error {{ background: rgba(255, 92, 92, 0.15); color: var(--server-error); }}
+  .badge-unknown {{ background: rgba(93, 138, 107, 0.2); color: var(--text-dim); }}
 
-  details.host-block {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.75rem; padding: 0.85rem 1rem; }}
+  details.host-block {{
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 0.65rem; padding: 0.8rem 1rem;
+  }}
+  details.host-block:last-child {{ margin-bottom: 0; }}
   details.host-block summary {{ cursor: pointer; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 0.6rem; }}
   details.host-block summary::-webkit-details-marker {{ display: none; }}
+  details.host-block summary::before {{ content: "▸"; color: var(--accent); transition: transform 0.15s; }}
+  details.host-block[open] summary::before {{ transform: rotate(90deg); }}
   details.host-block table {{ margin-top: 0.75rem; }}
-  .count-pill {{ font-size: 0.72rem; font-weight: 600; color: var(--text-dim); background: var(--surface-alt); padding: 0.1rem 0.5rem; border-radius: 999px; }}
-  .os-guess {{ color: var(--text-dim); font-size: 0.85rem; margin: 0.4rem 0 0; }}
+  .count-pill {{ font-size: 0.7rem; font-weight: 600; color: var(--text-dim); background: var(--surface-alt); padding: 0.1rem 0.5rem; border-radius: 999px; }}
+  .os-guess {{ color: var(--text-dim); font-size: 0.82rem; margin: 0.4rem 0 0; }}
 
-  .tag {{ display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; margin: 0.1rem; }}
-  .tag-danger {{ background: rgba(231, 76, 60, 0.15); color: var(--danger); }}
-  .tag-safe {{ background: rgba(46, 204, 113, 0.12); color: var(--safe); }}
-  tr.row-alert {{ background: rgba(231, 76, 60, 0.06); }}
+  .tag {{ display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; margin: 0.1rem; }}
+  .tag-danger {{ background: rgba(255, 92, 92, 0.15); color: var(--danger); }}
+  .tag-safe {{ background: rgba(0, 255, 127, 0.12); color: var(--safe); }}
+  tr.row-alert {{ background: rgba(255, 92, 92, 0.06); }}
 
-  .gallery {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }}
-  .gallery-item {{ display: block; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; text-decoration: none; }}
-  .gallery-item img {{ width: 100%; display: block; aspect-ratio: 16 / 10; object-fit: cover; background: #000; }}
-  .gallery-caption {{ display: block; padding: 0.5rem 0.7rem; font-size: 0.78rem; color: var(--text-dim); word-break: break-all; }}
+  /* Screenshot slideshow */
+  .slideshow {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }}
+  .slide-viewport {{
+    position: relative; display: flex; align-items: center; justify-content: center;
+    background: #000; border-radius: 4px; min-height: 280px; overflow: hidden;
+  }}
+  #slide-image {{ max-width: 100%; max-height: 480px; object-fit: contain; display: block; }}
+  .slide-nav {{
+    position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.55);
+    border: 1px solid var(--border-bright); color: var(--accent); width: 38px; height: 38px;
+    border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center;
+    justify-content: center; transition: background 0.15s, box-shadow 0.15s;
+  }}
+  .slide-nav:hover {{ background: rgba(0,255,127,0.2); box-shadow: 0 0 12px var(--accent-glow); }}
+  .slide-nav.prev {{ left: 0.75rem; }}
+  .slide-nav.next {{ right: 0.75rem; }}
+  .slide-counter {{
+    position: absolute; top: 0.6rem; right: 0.75rem; background: rgba(0,0,0,0.6); color: var(--accent);
+    font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 999px;
+  }}
+  .slide-caption {{ text-align: center; margin-top: 0.75rem; color: var(--text-dim); font-size: 0.82rem; word-break: break-all; }}
+  .slide-dots {{ display: flex; justify-content: center; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }}
+  .dot {{ width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--border-bright); background: transparent; cursor: pointer; padding: 0; }}
+  .dot.active {{ background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }}
 
-  .empty {{ color: var(--text-dim); font-style: italic; font-size: 0.9rem; }}
-  footer {{ margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.8rem; }}
+  .empty {{ color: var(--text-dim); font-style: italic; font-size: 0.88rem; }}
+  footer {{ margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.78rem; }}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <header class="top">
-    <h1>{e(summary.target)}</h1>
-    <div class="meta">Scan ID: {e(summary.scan_id)} &middot; Duration: {e(format_duration(summary.duration_seconds))}</div>
-  </header>
+  <div class="term-window">
+    <div class="term-bar">
+      <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
+      <span class="term-title">recon@framework:~/{e(summary.scan_id)}</span>
+    </div>
+    <div class="term-body">
+      <h1>
+        <span class="prompt">root@recon</span><span class="prompt-sep">:</span><span class="prompt-path">~$</span>
+        <span class="target-name">recon {e(summary.target)}</span><span class="cursor">&#9608;</span>
+      </h1>
+      <div class="meta">Scan ID: {e(summary.scan_id)} &middot; Duration: {e(format_duration(summary.duration_seconds))}</div>
+    </div>
+  </div>
 
-  <section>
-    <h2>Overview</h2>
+  <nav class="quick-nav">
+    <a href="#overview">overview</a>
+    <a href="#subdomains">subdomains</a>
+    <a href="#alive-hosts">alive_hosts</a>
+    <a href="#open-ports">open_ports</a>
+    <a href="#js-findings">js_findings</a>
+    <a href="#screenshots">screenshots</a>
+  </nav>
+
+  <section id="overview">
+    <h2>// Overview</h2>
     <div class="stat-grid">{stat_cards}</div>
   </section>
 
-  <section>
-    <h2>Subdomains ({len(summary.subdomains)})</h2>
+  <section id="subdomains">
+    <h2>// Subdomains ({len(summary.subdomains)})</h2>
     <input type="text" id="subdomain-filter" placeholder="Filter subdomains..." oninput="filterSubdomains(this.value)">
-    <div class="chip-grid" id="subdomain-chips">{subdomain_chips}</div>
+    <div class="scroll-panel">
+      <div class="chip-grid" id="subdomain-chips">{subdomain_chips}</div>
+    </div>
   </section>
 
-  <section>
-    <h2>Alive Hosts ({len(summary.alive_hosts)})</h2>
+  <section id="alive-hosts">
+    <h2>// Alive Hosts ({len(summary.alive_hosts)})</h2>
     {alive_table}
   </section>
 
-  <section>
-    <h2>Open Ports</h2>
-    {port_sections}
+  <section id="open-ports">
+    <h2>// Open Ports</h2>
+    <div class="panel-toolbar">
+      <input type="text" id="port-filter" placeholder="Filter hosts..." oninput="filterPorts(this.value)">
+      <div class="toolbar-buttons">
+        <button class="btn-term" onclick="toggleAllDetails(true)">Expand All</button>
+        <button class="btn-term" onclick="toggleAllDetails(false)">Collapse All</button>
+      </div>
+    </div>
+    <div class="scroll-panel" id="port-panel">{port_sections}</div>
   </section>
 
-  <section>
-    <h2>JavaScript Findings</h2>
+  <section id="js-findings">
+    <h2>// JavaScript Findings</h2>
     {js_table}
   </section>
 
-  <section>
-    <h2>Screenshots ({len(screenshots)})</h2>
+  <section id="screenshots">
+    <h2>// Screenshots ({len(screenshots)})</h2>
     {gallery}
   </section>
 
@@ -544,6 +580,7 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
 </div>
 
 <script type="application/json" id="scan-data">{raw_json}</script>
+<script type="application/json" id="screenshot-data">{screenshot_json}</script>
 <script>
   function filterSubdomains(query) {{
     const q = query.trim().toLowerCase();
@@ -552,6 +589,66 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
       chip.style.display = match ? 'inline-block' : 'none';
     }});
   }}
+
+  function filterPorts(query) {{
+    const q = query.trim().toLowerCase();
+    document.querySelectorAll('#port-panel .host-block').forEach(function (block) {{
+      const match = block.getAttribute('data-filter').includes(q);
+      block.style.display = match ? 'block' : 'none';
+    }});
+  }}
+
+  function toggleAllDetails(state) {{
+    document.querySelectorAll('#port-panel .host-block').forEach(function (d) {{ d.open = state; }});
+  }}
+
+  (function initSlideshow() {{
+    const dataEl = document.getElementById('screenshot-data');
+    if (!dataEl) return;
+    let slides = [];
+    try {{ slides = JSON.parse(dataEl.textContent || '[]'); }} catch (err) {{ slides = []; }}
+    if (!slides.length) return;
+
+    let idx = 0;
+    const img = document.getElementById('slide-image');
+    const caption = document.getElementById('slide-caption');
+    const counter = document.getElementById('slide-index');
+    const dotsWrap = document.getElementById('slide-dots');
+
+    slides.forEach(function (_, i) {{
+      const dot = document.createElement('button');
+      dot.className = 'dot';
+      dot.setAttribute('aria-label', 'Screenshot ' + (i + 1));
+      dot.onclick = function () {{ goToSlide(i); }};
+      dotsWrap.appendChild(dot);
+    }});
+
+    function render() {{
+      img.src = slides[idx].data_uri;
+      img.alt = slides[idx].name;
+      caption.textContent = slides[idx].name;
+      counter.textContent = String(idx + 1);
+      document.querySelectorAll('#slide-dots .dot').forEach(function (d, i) {{
+        d.classList.toggle('active', i === idx);
+      }});
+    }}
+
+    window.changeSlide = function (delta) {{
+      idx = (idx + delta + slides.length) % slides.length;
+      render();
+    }};
+    window.goToSlide = function (i) {{
+      idx = i;
+      render();
+    }};
+
+    document.addEventListener('keydown', function (e) {{
+      if (e.key === 'ArrowLeft') window.changeSlide(-1);
+      if (e.key === 'ArrowRight') window.changeSlide(1);
+    }});
+
+    render();
+  }})();
 </script>
 </body>
 </html>
