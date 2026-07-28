@@ -1,0 +1,9 @@
+{
+  "target": "example.com",
+  "target_type": "domain",
+  "raw_input": "example.com",
+  "scan_id": "20260726-102954-3d7e16",
+  "report_dir": "/home/arun/nwe/reports/example.com/20260726-102954-3d7e16",
+  "threads": 50,
+  "timeout": 20
+}
