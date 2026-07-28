@@ -182,7 +182,6 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
     stats = summary.statistics
     screenshots = _embed_screenshots(report_dir)
 
-    # ---- Stat cards -----------------------------------------------------
     stat_labels = {
         "subdomains_found": "Subdomains",
         "alive_hosts": "Alive Hosts",
@@ -209,7 +208,6 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
         for key, value in stats.items()
     )
 
-    # ---- Subdomains as clickable chips -----------------------------------
     if summary.subdomains:
         subdomain_chips = "".join(
             f'<a class="chip" href="https://{e(s)}" target="_blank" rel="noopener noreferrer" '
@@ -219,7 +217,6 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
     else:
         subdomain_chips = '<p class="empty">No subdomains found.</p>'
 
-    # ---- Alive hosts table ------------------------------------------------
     if summary.alive_hosts:
         alive_rows = "".join(
             f'<tr><td><a href="{e(h.url)}" target="_blank" rel="noopener noreferrer">{e(h.url)}</a></td>'
@@ -237,7 +234,6 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
     else:
         alive_table = '<p class="empty">No alive hosts found.</p>'
 
-    # ---- Ports, grouped per host in collapsible sections ------------------
     if summary.port_results:
         port_sections = ""
         for host_result in summary.port_results:
@@ -265,7 +261,6 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
     else:
         port_sections = '<p class="empty">No hosts were port scanned.</p>'
 
-    # ---- JavaScript findings table -----------------------------------------
     if summary.js_findings:
         js_rows = ""
         for finding in summary.js_findings:
@@ -291,7 +286,6 @@ def generate_report(summary: ScanSummary, report_dir: Path) -> Path:
     else:
         js_table = '<p class="empty">No JavaScript findings.</p>'
 
-    # ---- Screenshot slideshow (fully embedded, no external files) ---------
     if screenshots:
         gallery = f"""<div class="slideshow">
       <div class="slide-viewport">
