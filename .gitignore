@@ -23,7 +23,10 @@ screenshots/
 *.tmp
 
 # Installation Steps
-installation.md
+INSTALLATION.md
 
 # Sample Reports
-reports/*
+reports/
+*.log
+*.json
+*.txt
