@@ -1,0 +1,69 @@
+[
+  {
+    "host": "example.com",
+    "os_guess": "",
+    "ports": []
+  },
+  {
+    "host": "www.example.com",
+    "os_guess": "",
+    "ports": [
+      {
+        "port": 21,
+        "protocol": "tcp",
+        "state": "open",
+        "service": "tcpwrapped",
+        "product": "",
+        "version": ""
+      },
+      {
+        "port": 80,
+        "protocol": "tcp",
+        "state": "open",
+        "service": "http",
+        "product": "cloudflare",
+        "version": ""
+      },
+      {
+        "port": 110,
+        "protocol": "tcp",
+        "state": "open",
+        "service": "tcpwrapped",
+        "product": "",
+        "version": ""
+      },
+      {
+        "port": 135,
+        "protocol": "tcp",
+        "state": "open",
+        "service": "tcpwrapped",
+        "product": "",
+        "version": ""
+      },
+      {
+        "port": 143,
+        "protocol": "tcp",
+        "state": "open",
+        "service": "tcpwrapped",
+        "product": "",
+        "version": ""
+      },
+      {
+        "port": 443,
+        "protocol": "tcp",
+        "state": "open",
+        "service": "tcpwrapped",
+        "product": "",
+        "version": ""
+      },
+      {
+        "port": 8080,
+        "protocol": "tcp",
+        "state": "open",
+        "service": "http",
+        "product": "Cloudflare http proxy",
+        "version": ""
+      }
+    ]
+  }
+]
