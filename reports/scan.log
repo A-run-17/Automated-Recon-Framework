@@ -1,0 +1,10 @@
+2026-07-26 10:29:54 [INFO] recon: Starting scan of example.com (scan ID: 20260726-102954-3d7e16)
+2026-07-26 10:29:54 [INFO] recon: Report directory: /home/arun/nwe/reports/example.com/20260726-102954-3d7e16
+2026-07-26 10:29:54 [INFO] recon: Stage: subdomain enumeration
+2026-07-26 10:31:48 [INFO] recon: Stage: HTTP probing
+2026-07-26 10:39:15 [INFO] recon: Stage: port scanning
+2026-07-26 10:45:18 [INFO] recon: Stage: JavaScript analysis
+2026-07-26 10:45:19 [INFO] recon: Stage: screenshot capture
+2026-07-26 10:45:31 [INFO] recon: Stage: report generation
+2026-07-26 10:45:31 [INFO] recon: Scan complete in 937.0s
+2026-07-26 10:45:31 [INFO] recon: Results saved to /home/arun/nwe/reports/example.com/20260726-102954-3d7e16
