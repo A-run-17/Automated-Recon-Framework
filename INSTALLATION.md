@@ -82,8 +82,4 @@ python3 recon.py example.com --ports --http
 python3 recon.py example.com --threads 30 --timeout 15
 ```
 
-## 9. View results
-```bash
-ls -R reports/example.com/
-explorer.exe reports/example.com/<scan-id>/report.html
-```
+
