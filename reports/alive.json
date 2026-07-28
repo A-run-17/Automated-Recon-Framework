@@ -1,0 +1,42 @@
+[
+  {
+    "url": "https://example.com",
+    "status_code": 200,
+    "title": "Example Domain",
+    "technologies": [
+      "Cloudflare"
+    ],
+    "webserver": "cloudflare",
+    "content_length": 559
+  },
+  {
+    "url": "https://example.com",
+    "status_code": 200,
+    "title": "Example Domain",
+    "technologies": [
+      "Cloudflare"
+    ],
+    "webserver": "cloudflare",
+    "content_length": 559
+  },
+  {
+    "url": "https://www.example.com",
+    "status_code": 200,
+    "title": "Example Domain",
+    "technologies": [
+      "Cloudflare"
+    ],
+    "webserver": "cloudflare",
+    "content_length": 559
+  },
+  {
+    "url": "https://www.example.com",
+    "status_code": 200,
+    "title": "Example Domain",
+    "technologies": [
+      "Cloudflare"
+    ],
+    "webserver": "cloudflare",
+    "content_length": 559
+  }
+]
