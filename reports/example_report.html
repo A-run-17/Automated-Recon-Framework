@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recon Report — example.com</title>
+<style>
+  :root {
+    --bg: #060a08;
+    --surface: #0b120d;
+    --surface-alt: #101a13;
+    --border: #1e3a26;
+    --border-bright: #00ff7f;
+    --text: #c9ffd6;
+    --text-dim: #5d8a6b;
+    --accent: #00ff7f;
+    --accent-glow: rgba(0, 255, 127, 0.35);
+    --ok: #00ff7f;
+    --redirect: #ffe066;
+    --client-error: #ff9f43;
+    --server-error: #ff5c5c;
+    --danger: #ff5c5c;
+    --safe: #00ff7f;
+    --radius: 6px;
+    --mono: "Consolas", "SFMono-Regular", "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    line-height: 1.55;
+    position: relative;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999;
+    background: repeating-linear-gradient(0deg, rgba(0,255,127,0.025) 0px, rgba(0,255,127,0.025) 1px, transparent 1px, transparent 3px);
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  section { scroll-margin-top: 4.5rem; }
+
+  /* Terminal-style header */
+  .term-window {
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem;
+    box-shadow: 0 0 30px rgba(0, 255, 127, 0.06);
+  }
+  .term-bar {
+    background: #0d1710; padding: 0.55rem 0.9rem; display: flex; align-items: center; gap: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .term-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .term-dot.red { background: #ff5f56; }
+  .term-dot.yellow { background: #ffbd2e; }
+  .term-dot.green { background: #27c93f; }
+  .term-title { margin-left: 0.6rem; color: var(--text-dim); font-size: 0.78rem; }
+  .term-body { padding: 1.15rem 1.4rem; }
+  .term-body h1 {
+    margin: 0; font-size: 1.35rem; font-weight: 700; display: flex; align-items: baseline;
+    gap: 0.4rem; flex-wrap: wrap;
+  }
+  .prompt { color: var(--accent); }
+  .prompt-sep, .prompt-path { color: var(--text-dim); }
+  .target-name { color: var(--text); }
+  .cursor { display: inline-block; width: 0.5em; color: var(--accent); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .meta { color: var(--text-dim); font-size: 0.82rem; margin-top: 0.4rem; }
+
+  /* Quick nav */
+  .quick-nav {
+    position: sticky; top: 0.75rem; z-index: 10; display: flex; flex-wrap: wrap; gap: 0.25rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.5rem; margin-bottom: 2rem;
+  }
+  .quick-nav a {
+    color: var(--text-dim); text-decoration: none; font-size: 0.76rem; padding: 0.3rem 0.6rem;
+    border-radius: 4px; transition: background 0.15s, color 0.15s;
+  }
+  .quick-nav a::before { content: "#"; margin-right: 0.15rem; opacity: 0.6; }
+  .quick-nav a:hover { color: var(--bg); background: var(--accent); }
+
+  h2 {
+    font-size: 1rem; letter-spacing: 0.03em; color: var(--accent); margin: 2.25rem 0 1rem;
+    font-weight: 600; border-left: 3px solid var(--accent); padding-left: 0.6rem;
+  }
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.75rem; margin-top: 1rem;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem; text-align: center; text-decoration: none; color: inherit; display: block;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; cursor: pointer;
+  }
+  .stat-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 0 18px var(--accent-glow); }
+  .stat-card.stat-alert { border-color: var(--danger); background: rgba(255, 92, 92, 0.08); }
+  .stat-value { font-size: 1.6rem; font-weight: 700; }
+  .stat-label { font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.25rem; }
+
+  input[type="text"] {
+    width: 100%; padding: 0.6rem 0.9rem; border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 0.85rem; font-family: var(--mono);
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+
+  /* Contained scroll panels so long lists don't push the whole page down */
+  .scroll-panel {
+    max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 0.85rem; background: var(--surface);
+  }
+  .scroll-panel::-webkit-scrollbar { width: 8px; }
+  .scroll-panel::-webkit-scrollbar-track { background: var(--surface); }
+  .scroll-panel::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 4px; opacity: 0.5; }
+
+  .panel-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 0.75rem; }
+  .panel-toolbar input { flex: 1; min-width: 200px; margin-bottom: 0; }
+  .toolbar-buttons { display: flex; gap: 0.4rem; }
+  .btn-term {
+    background: var(--surface-alt); border: 1px solid var(--border); color: var(--accent);
+    padding: 0.45rem 0.8rem; border-radius: 4px; font-family: var(--mono); font-size: 0.75rem;
+    cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; white-space: nowrap;
+  }
+  .btn-term:hover { border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+
+  #subdomain-filter { margin-bottom: 0.85rem; }
+  .chip-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .chip {
+    display: inline-block; padding: 0.35rem 0.75rem; background: var(--surface-alt);
+    border: 1px solid var(--border); border-radius: 999px; color: var(--accent);
+    text-decoration: none; font-size: 0.82rem; transition: border-color 0.15s;
+  }
+  .chip:hover { border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
+  th, td { padding: 0.6rem 0.85rem; text-align: left; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+  th { background: var(--surface-alt); color: var(--text-dim); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.04em; }
+  tr:last-child td { border-bottom: none; }
+  td a { color: var(--accent); text-decoration: none; word-break: break-all; }
+  td a:hover { text-decoration: underline; }
+
+  .badge { padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
+  .badge-ok { background: rgba(0, 255, 127, 0.15); color: var(--ok); }
+  .badge-redirect { background: rgba(255, 224, 102, 0.15); color: var(--redirect); }
+  .badge-client-error { background: rgba(255, 159, 67, 0.15); color: var(--client-error); }
+  .badge-server-error { background: rgba(255, 92, 92, 0.15); color: var(--server-error); }
+  .badge-unknown { background: rgba(93, 138, 107, 0.2); color: var(--text-dim); }
+
+  details.host-block {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 0.65rem; padding: 0.8rem 1rem;
+  }
+  details.host-block:last-child { margin-bottom: 0; }
+  details.host-block summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 0.6rem; }
+  details.host-block summary::-webkit-details-marker { display: none; }
+  details.host-block summary::before { content: "▸"; color: var(--accent); transition: transform 0.15s; }
+  details.host-block[open] summary::before { transform: rotate(90deg); }
+  details.host-block table { margin-top: 0.75rem; }
+  .count-pill { font-size: 0.7rem; font-weight: 600; color: var(--text-dim); background: var(--surface-alt); padding: 0.1rem 0.5rem; border-radius: 999px; }
+  .os-guess { color: var(--text-dim); font-size: 0.82rem; margin: 0.4rem 0 0; }
+
+  .tag { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; margin: 0.1rem; }
+  .tag-danger { background: rgba(255, 92, 92, 0.15); color: var(--danger); }
+  .tag-safe { background: rgba(0, 255, 127, 0.12); color: var(--safe); }
+  tr.row-alert { background: rgba(255, 92, 92, 0.06); }
+
+  /* Screenshot slideshow */
+  .slideshow { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+  .slide-viewport {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    background: #000; border-radius: 4px; min-height: 280px; overflow: hidden;
+  }
+  #slide-image { max-width: 100%; max-height: 480px; object-fit: contain; display: block; }
+  .slide-nav {
+    position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.55);
+    border: 1px solid var(--border-bright); color: var(--accent); width: 38px; height: 38px;
+    border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center;
+    justify-content: center; transition: background 0.15s, box-shadow 0.15s;
+  }
+  .slide-nav:hover { background: rgba(0,255,127,0.2); box-shadow: 0 0 12px var(--accent-glow); }
+  .slide-nav.prev { left: 0.75rem; }
+  .slide-nav.next { right: 0.75rem; }
+  .slide-counter {
+    position: absolute; top: 0.6rem; right: 0.75rem; background: rgba(0,0,0,0.6); color: var(--accent);
+    font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 999px;
+  }
+  .slide-caption { text-align: center; margin-top: 0.75rem; color: var(--text-dim); font-size: 0.82rem; word-break: break-all; }
+  .slide-dots { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--border-bright); background: transparent; cursor: pointer; padding: 0; }
+  .dot.active { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+
+  .empty { color: var(--text-dim); font-style: italic; font-size: 0.88rem; }
+  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.78rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="term-window">
+    <div class="term-bar">
+      <span class="term-dot red"></span><span class="term-dot yellow"></span><span class="term-dot green"></span>
+      <span class="term-title">recon@framework:~/scan-20260726-0142</span>
+    </div>
+    <div class="term-body">
+      <h1>
+        <span class="prompt">root@recon</span><span class="prompt-sep">:</span><span class="prompt-path">~$</span>
+        <span class="target-name">./scan example.com</span><span class="cursor">&#9608;</span>
+      </h1>
+      <div class="meta">Scan ID: scan-20260726-0142 &middot; Duration: 30m 47s</div>
+    </div>
+  </div>
+
+  <nav class="quick-nav">
+    <a href="#overview">overview</a>
+    <a href="#subdomains">subdomains</a>
+    <a href="#alive-hosts">alive_hosts</a>
+    <a href="#open-ports">open_ports</a>
+    <a href="#js-findings">js_findings</a>
+    <a href="#screenshots">screenshots</a>
+  </nav>
+
+  <section id="overview">
+    <h2>// Overview</h2>
+    <div class="stat-grid"><a class="stat-card" href="#subdomains"><div class="stat-value">144</div><div class="stat-label">Subdomains</div></a><a class="stat-card" href="#alive-hosts"><div class="stat-value">6</div><div class="stat-label">Alive Hosts</div></a><a class="stat-card" href="#open-ports"><div class="stat-value">28</div><div class="stat-label">Hosts Scanned</div></a><a class="stat-card" href="#open-ports"><div class="stat-value">64</div><div class="stat-label">Open Ports</div></a><a class="stat-card" href="#js-findings"><div class="stat-value">2</div><div class="stat-label">JS Files</div></a><a class="stat-card stat-alert" href="#js-findings"><div class="stat-value">1</div><div class="stat-label">Possible Secrets</div></a><a class="stat-card" href="#screenshots"><div class="stat-value">5</div><div class="stat-label">Screenshots</div></a></div>
+  </section>
+
+  <section id="subdomains">
+    <h2>// Subdomains (144)</h2>
+    <input type="text" id="subdomain-filter" placeholder="Filter subdomains..." oninput="filterSubdomains(this.value)">
+    <div class="scroll-panel">
+      <div class="chip-grid" id="subdomain-chips"><a class="chip" href="https://host1.example.com" target="_blank" rel="noopener noreferrer" data-filter="host1.example.com">host1.example.com</a><a class="chip" href="https://host2.example.com" target="_blank" rel="noopener noreferrer" data-filter="host2.example.com">host2.example.com</a><a class="chip" href="https://host3.example.com" target="_blank" rel="noopener noreferrer" data-filter="host3.example.com">host3.example.com</a><a class="chip" href="https://host4.example.com" target="_blank" rel="noopener noreferrer" data-filter="host4.example.com">host4.example.com</a><a class="chip" href="https://host5.example.com" target="_blank" rel="noopener noreferrer" data-filter="host5.example.com">host5.example.com</a><a class="chip" href="https://host6.example.com" target="_blank" rel="noopener noreferrer" data-filter="host6.example.com">host6.example.com</a><a class="chip" href="https://host7.example.com" target="_blank" rel="noopener noreferrer" data-filter="host7.example.com">host7.example.com</a><a class="chip" href="https://host8.example.com" target="_blank" rel="noopener noreferrer" data-filter="host8.example.com">host8.example.com</a><a class="chip" href="https://host9.example.com" target="_blank" rel="noopener noreferrer" data-filter="host9.example.com">host9.example.com</a><a class="chip" href="https://host10.example.com" target="_blank" rel="noopener noreferrer" data-filter="host10.example.com">host10.example.com</a><a class="chip" href="https://host11.example.com" target="_blank" rel="noopener noreferrer" data-filter="host11.example.com">host11.example.com</a><a class="chip" href="https://host12.example.com" target="_blank" rel="noopener noreferrer" data-filter="host12.example.com">host12.example.com</a><a class="chip" href="https://host13.example.com" target="_blank" rel="noopener noreferrer" data-filter="host13.example.com">host13.example.com</a><a class="chip" href="https://host14.example.com" target="_blank" rel="noopener noreferrer" data-filter="host14.example.com">host14.example.com</a><a class="chip" href="https://host15.example.com" target="_blank" rel="noopener noreferrer" data-filter="host15.example.com">host15.example.com</a><a class="chip" href="https://host16.example.com" target="_blank" rel="noopener noreferrer" data-filter="host16.example.com">host16.example.com</a><a class="chip" href="https://host17.example.com" target="_blank" rel="noopener noreferrer" data-filter="host17.example.com">host17.example.com</a><a class="chip" href="https://host18.example.com" target="_blank" rel="noopener noreferrer" data-filter="host18.example.com">host18.example.com</a><a class="chip" href="https://host19.example.com" target="_blank" rel="noopener noreferrer" data-filter="host19.example.com">host19.example.com</a><a class="chip" href="https://host20.example.com" target="_blank" rel="noopener noreferrer" data-filter="host20.example.com">host20.example.com</a><a class="chip" href="https://host21.example.com" target="_blank" rel="noopener noreferrer" data-filter="host21.example.com">host21.example.com</a><a class="chip" href="https://host22.example.com" target="_blank" rel="noopener noreferrer" data-filter="host22.example.com">host22.example.com</a><a class="chip" href="https://host23.example.com" target="_blank" rel="noopener noreferrer" data-filter="host23.example.com">host23.example.com</a><a class="chip" href="https://host24.example.com" target="_blank" rel="noopener noreferrer" data-filter="host24.example.com">host24.example.com</a><a class="chip" href="https://host25.example.com" target="_blank" rel="noopener noreferrer" data-filter="host25.example.com">host25.example.com</a><a class="chip" href="https://host26.example.com" target="_blank" rel="noopener noreferrer" data-filter="host26.example.com">host26.example.com</a><a class="chip" href="https://host27.example.com" target="_blank" rel="noopener noreferrer" data-filter="host27.example.com">host27.example.com</a><a class="chip" href="https://host28.example.com" target="_blank" rel="noopener noreferrer" data-filter="host28.example.com">host28.example.com</a><a class="chip" href="https://host29.example.com" target="_blank" rel="noopener noreferrer" data-filter="host29.example.com">host29.example.com</a><a class="chip" href="https://host30.example.com" target="_blank" rel="noopener noreferrer" data-filter="host30.example.com">host30.example.com</a><a class="chip" href="https://host31.example.com" target="_blank" rel="noopener noreferrer" data-filter="host31.example.com">host31.example.com</a><a class="chip" href="https://host32.example.com" target="_blank" rel="noopener noreferrer" data-filter="host32.example.com">host32.example.com</a><a class="chip" href="https://host33.example.com" target="_blank" rel="noopener noreferrer" data-filter="host33.example.com">host33.example.com</a><a class="chip" href="https://host34.example.com" target="_blank" rel="noopener noreferrer" data-filter="host34.example.com">host34.example.com</a><a class="chip" href="https://host35.example.com" target="_blank" rel="noopener noreferrer" data-filter="host35.example.com">host35.example.com</a><a class="chip" href="https://host36.example.com" target="_blank" rel="noopener noreferrer" data-filter="host36.example.com">host36.example.com</a><a class="chip" href="https://host37.example.com" target="_blank" rel="noopener noreferrer" data-filter="host37.example.com">host37.example.com</a><a class="chip" href="https://host38.example.com" target="_blank" rel="noopener noreferrer" data-filter="host38.example.com">host38.example.com</a><a class="chip" href="https://host39.example.com" target="_blank" rel="noopener noreferrer" data-filter="host39.example.com">host39.example.com</a><a class="chip" href="https://host40.example.com" target="_blank" rel="noopener noreferrer" data-filter="host40.example.com">host40.example.com</a><a class="chip" href="https://host41.example.com" target="_blank" rel="noopener noreferrer" data-filter="host41.example.com">host41.example.com</a><a class="chip" href="https://host42.example.com" target="_blank" rel="noopener noreferrer" data-filter="host42.example.com">host42.example.com</a><a class="chip" href="https://host43.example.com" target="_blank" rel="noopener noreferrer" data-filter="host43.example.com">host43.example.com</a><a class="chip" href="https://host44.example.com" target="_blank" rel="noopener noreferrer" data-filter="host44.example.com">host44.example.com</a><a class="chip" href="https://host45.example.com" target="_blank" rel="noopener noreferrer" data-filter="host45.example.com">host45.example.com</a><a class="chip" href="https://host46.example.com" target="_blank" rel="noopener noreferrer" data-filter="host46.example.com">host46.example.com</a><a class="chip" href="https://host47.example.com" target="_blank" rel="noopener noreferrer" data-filter="host47.example.com">host47.example.com</a><a class="chip" href="https://host48.example.com" target="_blank" rel="noopener noreferrer" data-filter="host48.example.com">host48.example.com</a><a class="chip" href="https://host49.example.com" target="_blank" rel="noopener noreferrer" data-filter="host49.example.com">host49.example.com</a><a class="chip" href="https://host50.example.com" target="_blank" rel="noopener noreferrer" data-filter="host50.example.com">host50.example.com</a><a class="chip" href="https://host51.example.com" target="_blank" rel="noopener noreferrer" data-filter="host51.example.com">host51.example.com</a><a class="chip" href="https://host52.example.com" target="_blank" rel="noopener noreferrer" data-filter="host52.example.com">host52.example.com</a><a class="chip" href="https://host53.example.com" target="_blank" rel="noopener noreferrer" data-filter="host53.example.com">host53.example.com</a><a class="chip" href="https://host54.example.com" target="_blank" rel="noopener noreferrer" data-filter="host54.example.com">host54.example.com</a><a class="chip" href="https://host55.example.com" target="_blank" rel="noopener noreferrer" data-filter="host55.example.com">host55.example.com</a><a class="chip" href="https://host56.example.com" target="_blank" rel="noopener noreferrer" data-filter="host56.example.com">host56.example.com</a><a class="chip" href="https://host57.example.com" target="_blank" rel="noopener noreferrer" data-filter="host57.example.com">host57.example.com</a><a class="chip" href="https://host58.example.com" target="_blank" rel="noopener noreferrer" data-filter="host58.example.com">host58.example.com</a><a class="chip" href="https://host59.example.com" target="_blank" rel="noopener noreferrer" data-filter="host59.example.com">host59.example.com</a><a class="chip" href="https://host60.example.com" target="_blank" rel="noopener noreferrer" data-filter="host60.example.com">host60.example.com</a><a class="chip" href="https://host61.example.com" target="_blank" rel="noopener noreferrer" data-filter="host61.example.com">host61.example.com</a><a class="chip" href="https://host62.example.com" target="_blank" rel="noopener noreferrer" data-filter="host62.example.com">host62.example.com</a><a class="chip" href="https://host63.example.com" target="_blank" rel="noopener noreferrer" data-filter="host63.example.com">host63.example.com</a><a class="chip" href="https://host64.example.com" target="_blank" rel="noopener noreferrer" data-filter="host64.example.com">host64.example.com</a><a class="chip" href="https://host65.example.com" target="_blank" rel="noopener noreferrer" data-filter="host65.example.com">host65.example.com</a><a class="chip" href="https://host66.example.com" target="_blank" rel="noopener noreferrer" data-filter="host66.example.com">host66.example.com</a><a class="chip" href="https://host67.example.com" target="_blank" rel="noopener noreferrer" data-filter="host67.example.com">host67.example.com</a><a class="chip" href="https://host68.example.com" target="_blank" rel="noopener noreferrer" data-filter="host68.example.com">host68.example.com</a><a class="chip" href="https://host69.example.com" target="_blank" rel="noopener noreferrer" data-filter="host69.example.com">host69.example.com</a><a class="chip" href="https://host70.example.com" target="_blank" rel="noopener noreferrer" data-filter="host70.example.com">host70.example.com</a><a class="chip" href="https://host71.example.com" target="_blank" rel="noopener noreferrer" data-filter="host71.example.com">host71.example.com</a><a class="chip" href="https://host72.example.com" target="_blank" rel="noopener noreferrer" data-filter="host72.example.com">host72.example.com</a><a class="chip" href="https://host73.example.com" target="_blank" rel="noopener noreferrer" data-filter="host73.example.com">host73.example.com</a><a class="chip" href="https://host74.example.com" target="_blank" rel="noopener noreferrer" data-filter="host74.example.com">host74.example.com</a><a class="chip" href="https://host75.example.com" target="_blank" rel="noopener noreferrer" data-filter="host75.example.com">host75.example.com</a><a class="chip" href="https://host76.example.com" target="_blank" rel="noopener noreferrer" data-filter="host76.example.com">host76.example.com</a><a class="chip" href="https://host77.example.com" target="_blank" rel="noopener noreferrer" data-filter="host77.example.com">host77.example.com</a><a class="chip" href="https://host78.example.com" target="_blank" rel="noopener noreferrer" data-filter="host78.example.com">host78.example.com</a><a class="chip" href="https://host79.example.com" target="_blank" rel="noopener noreferrer" data-filter="host79.example.com">host79.example.com</a><a class="chip" href="https://host80.example.com" target="_blank" rel="noopener noreferrer" data-filter="host80.example.com">host80.example.com</a><a class="chip" href="https://host81.example.com" target="_blank" rel="noopener noreferrer" data-filter="host81.example.com">host81.example.com</a><a class="chip" href="https://host82.example.com" target="_blank" rel="noopener noreferrer" data-filter="host82.example.com">host82.example.com</a><a class="chip" href="https://host83.example.com" target="_blank" rel="noopener noreferrer" data-filter="host83.example.com">host83.example.com</a><a class="chip" href="https://host84.example.com" target="_blank" rel="noopener noreferrer" data-filter="host84.example.com">host84.example.com</a><a class="chip" href="https://host85.example.com" target="_blank" rel="noopener noreferrer" data-filter="host85.example.com">host85.example.com</a><a class="chip" href="https://host86.example.com" target="_blank" rel="noopener noreferrer" data-filter="host86.example.com">host86.example.com</a><a class="chip" href="https://host87.example.com" target="_blank" rel="noopener noreferrer" data-filter="host87.example.com">host87.example.com</a><a class="chip" href="https://host88.example.com" target="_blank" rel="noopener noreferrer" data-filter="host88.example.com">host88.example.com</a><a class="chip" href="https://host89.example.com" target="_blank" rel="noopener noreferrer" data-filter="host89.example.com">host89.example.com</a><a class="chip" href="https://host90.example.com" target="_blank" rel="noopener noreferrer" data-filter="host90.example.com">host90.example.com</a><a class="chip" href="https://host91.example.com" target="_blank" rel="noopener noreferrer" data-filter="host91.example.com">host91.example.com</a><a class="chip" href="https://host92.example.com" target="_blank" rel="noopener noreferrer" data-filter="host92.example.com">host92.example.com</a><a class="chip" href="https://host93.example.com" target="_blank" rel="noopener noreferrer" data-filter="host93.example.com">host93.example.com</a><a class="chip" href="https://host94.example.com" target="_blank" rel="noopener noreferrer" data-filter="host94.example.com">host94.example.com</a><a class="chip" href="https://host95.example.com" target="_blank" rel="noopener noreferrer" data-filter="host95.example.com">host95.example.com</a><a class="chip" href="https://host96.example.com" target="_blank" rel="noopener noreferrer" data-filter="host96.example.com">host96.example.com</a><a class="chip" href="https://host97.example.com" target="_blank" rel="noopener noreferrer" data-filter="host97.example.com">host97.example.com</a><a class="chip" href="https://host98.example.com" target="_blank" rel="noopener noreferrer" data-filter="host98.example.com">host98.example.com</a><a class="chip" href="https://host99.example.com" target="_blank" rel="noopener noreferrer" data-filter="host99.example.com">host99.example.com</a><a class="chip" href="https://host100.example.com" target="_blank" rel="noopener noreferrer" data-filter="host100.example.com">host100.example.com</a><a class="chip" href="https://host101.example.com" target="_blank" rel="noopener noreferrer" data-filter="host101.example.com">host101.example.com</a><a class="chip" href="https://host102.example.com" target="_blank" rel="noopener noreferrer" data-filter="host102.example.com">host102.example.com</a><a class="chip" href="https://host103.example.com" target="_blank" rel="noopener noreferrer" data-filter="host103.example.com">host103.example.com</a><a class="chip" href="https://host104.example.com" target="_blank" rel="noopener noreferrer" data-filter="host104.example.com">host104.example.com</a><a class="chip" href="https://host105.example.com" target="_blank" rel="noopener noreferrer" data-filter="host105.example.com">host105.example.com</a><a class="chip" href="https://host106.example.com" target="_blank" rel="noopener noreferrer" data-filter="host106.example.com">host106.example.com</a><a class="chip" href="https://host107.example.com" target="_blank" rel="noopener noreferrer" data-filter="host107.example.com">host107.example.com</a><a class="chip" href="https://host108.example.com" target="_blank" rel="noopener noreferrer" data-filter="host108.example.com">host108.example.com</a><a class="chip" href="https://host109.example.com" target="_blank" rel="noopener noreferrer" data-filter="host109.example.com">host109.example.com</a><a class="chip" href="https://host110.example.com" target="_blank" rel="noopener noreferrer" data-filter="host110.example.com">host110.example.com</a><a class="chip" href="https://host111.example.com" target="_blank" rel="noopener noreferrer" data-filter="host111.example.com">host111.example.com</a><a class="chip" href="https://host112.example.com" target="_blank" rel="noopener noreferrer" data-filter="host112.example.com">host112.example.com</a><a class="chip" href="https://host113.example.com" target="_blank" rel="noopener noreferrer" data-filter="host113.example.com">host113.example.com</a><a class="chip" href="https://host114.example.com" target="_blank" rel="noopener noreferrer" data-filter="host114.example.com">host114.example.com</a><a class="chip" href="https://host115.example.com" target="_blank" rel="noopener noreferrer" data-filter="host115.example.com">host115.example.com</a><a class="chip" href="https://host116.example.com" target="_blank" rel="noopener noreferrer" data-filter="host116.example.com">host116.example.com</a><a class="chip" href="https://host117.example.com" target="_blank" rel="noopener noreferrer" data-filter="host117.example.com">host117.example.com</a><a class="chip" href="https://host118.example.com" target="_blank" rel="noopener noreferrer" data-filter="host118.example.com">host118.example.com</a><a class="chip" href="https://host119.example.com" target="_blank" rel="noopener noreferrer" data-filter="host119.example.com">host119.example.com</a><a class="chip" href="https://host120.example.com" target="_blank" rel="noopener noreferrer" data-filter="host120.example.com">host120.example.com</a><a class="chip" href="https://host121.example.com" target="_blank" rel="noopener noreferrer" data-filter="host121.example.com">host121.example.com</a><a class="chip" href="https://host122.example.com" target="_blank" rel="noopener noreferrer" data-filter="host122.example.com">host122.example.com</a><a class="chip" href="https://host123.example.com" target="_blank" rel="noopener noreferrer" data-filter="host123.example.com">host123.example.com</a><a class="chip" href="https://host124.example.com" target="_blank" rel="noopener noreferrer" data-filter="host124.example.com">host124.example.com</a><a class="chip" href="https://host125.example.com" target="_blank" rel="noopener noreferrer" data-filter="host125.example.com">host125.example.com</a><a class="chip" href="https://host126.example.com" target="_blank" rel="noopener noreferrer" data-filter="host126.example.com">host126.example.com</a><a class="chip" href="https://host127.example.com" target="_blank" rel="noopener noreferrer" data-filter="host127.example.com">host127.example.com</a><a class="chip" href="https://host128.example.com" target="_blank" rel="noopener noreferrer" data-filter="host128.example.com">host128.example.com</a><a class="chip" href="https://host129.example.com" target="_blank" rel="noopener noreferrer" data-filter="host129.example.com">host129.example.com</a><a class="chip" href="https://host130.example.com" target="_blank" rel="noopener noreferrer" data-filter="host130.example.com">host130.example.com</a><a class="chip" href="https://host131.example.com" target="_blank" rel="noopener noreferrer" data-filter="host131.example.com">host131.example.com</a><a class="chip" href="https://host132.example.com" target="_blank" rel="noopener noreferrer" data-filter="host132.example.com">host132.example.com</a><a class="chip" href="https://host133.example.com" target="_blank" rel="noopener noreferrer" data-filter="host133.example.com">host133.example.com</a><a class="chip" href="https://host134.example.com" target="_blank" rel="noopener noreferrer" data-filter="host134.example.com">host134.example.com</a><a class="chip" href="https://host135.example.com" target="_blank" rel="noopener noreferrer" data-filter="host135.example.com">host135.example.com</a><a class="chip" href="https://host136.example.com" target="_blank" rel="noopener noreferrer" data-filter="host136.example.com">host136.example.com</a><a class="chip" href="https://host137.example.com" target="_blank" rel="noopener noreferrer" data-filter="host137.example.com">host137.example.com</a><a class="chip" href="https://host138.example.com" target="_blank" rel="noopener noreferrer" data-filter="host138.example.com">host138.example.com</a><a class="chip" href="https://host139.example.com" target="_blank" rel="noopener noreferrer" data-filter="host139.example.com">host139.example.com</a><a class="chip" href="https://admin.example.com" target="_blank" rel="noopener noreferrer" data-filter="admin.example.com">admin.example.com</a><a class="chip" href="https://vpn.example.com" target="_blank" rel="noopener noreferrer" data-filter="vpn.example.com">vpn.example.com</a><a class="chip" href="https://portal.example.com" target="_blank" rel="noopener noreferrer" data-filter="portal.example.com">portal.example.com</a><a class="chip" href="https://mail.example.com" target="_blank" rel="noopener noreferrer" data-filter="mail.example.com">mail.example.com</a><a class="chip" href="https://login.example.com" target="_blank" rel="noopener noreferrer" data-filter="login.example.com">login.example.com</a></div>
+    </div>
+  </section>
+
+  <section id="alive-hosts">
+    <h2>// Alive Hosts (6)</h2>
+    <table><thead><tr><th>URL</th><th>Status</th><th>Title</th><th>Server</th><th>Technologies</th></tr></thead><tbody><tr><td><a href="https://login.example.com" target="_blank" rel="noopener noreferrer">https://login.example.com</a></td><td><span class="badge badge-ok">200</span></td><td>Login Portal</td><td>nginx</td><td>React, Node.js</td></tr><tr><td><a href="https://admin.example.com" target="_blank" rel="noopener noreferrer">https://admin.example.com</a></td><td><span class="badge badge-client-error">401</span></td><td>Admin Panel</td><td>Apache</td><td>PHP</td></tr><tr><td><a href="https://portal.example.com" target="_blank" rel="noopener noreferrer">https://portal.example.com</a></td><td><span class="badge badge-ok">200</span></td><td>Customer Portal</td><td>nginx</td><td>Vue.js</td></tr><tr><td><a href="https://vpn.example.com" target="_blank" rel="noopener noreferrer">https://vpn.example.com</a></td><td><span class="badge badge-redirect">302</span></td><td>&mdash;</td><td>OpenVPN-AS</td><td>&mdash;</td></tr><tr><td><a href="https://mail.example.com" target="_blank" rel="noopener noreferrer">https://mail.example.com</a></td><td><span class="badge badge-ok">200</span></td><td>Webmail</td><td>Postfix</td><td>Roundcube</td></tr><tr><td><a href="https://old-app.example.com" target="_blank" rel="noopener noreferrer">https://old-app.example.com</a></td><td><span class="badge badge-server-error">500</span></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr></tbody></table>
+  </section>
+
+  <section id="open-ports">
+    <h2>// Open Ports</h2>
+    <div class="panel-toolbar">
+      <input type="text" id="port-filter" placeholder="Filter hosts..." oninput="filterPorts(this.value)">
+      <div class="toolbar-buttons">
+        <button class="btn-term" onclick="toggleAllDetails(true)">Expand All</button>
+        <button class="btn-term" onclick="toggleAllDetails(false)">Collapse All</button>
+      </div>
+    </div>
+    <div class="scroll-panel" id="port-panel"><details class="host-block" data-filter="host1.example.com"><summary>host1.example.com <span class="count-pill">1 open</span></summary><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>22</td><td>tcp</td><td>ssh</td><td>OpenSSH 8.9</td></tr></tbody></table></details><details class="host-block" data-filter="host2.example.com"><summary>host2.example.com <span class="count-pill">2 open</span></summary><p class="os-guess">OS guess: Linux 5.x</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>3306</td><td>tcp</td><td>mysql</td><td>MySQL 8.0</td></tr><tr><td>443</td><td>tcp</td><td>https</td><td>nginx 1.24</td></tr></tbody></table></details><details class="host-block" data-filter="host3.example.com"><summary>host3.example.com <span class="count-pill">1 open</span></summary><p class="os-guess">OS guess: Linux 5.x</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>21</td><td>tcp</td><td>ftp</td><td>vsftpd 3.0.5</td></tr></tbody></table></details><details class="host-block" data-filter="host4.example.com"><summary>host4.example.com <span class="count-pill">1 open</span></summary><p class="os-guess">OS guess: Ubuntu 22.04</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>80</td><td>tcp</td><td>http</td><td>nginx 1.24</td></tr></tbody></table></details><details class="host-block" data-filter="host5.example.com"><summary>host5.example.com <span class="count-pill">2 open</span></summary><p class="os-guess">OS guess: Ubuntu 22.04</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>53</td><td>udp</td><td>dns</td><td>BIND 9.18</td></tr><tr><td>22</td><td>tcp</td><td>ssh</td><td>OpenSSH 8.9</td></tr></tbody></table></details><details class="host-block" data-filter="host6.example.com"><summary>host6.example.com <span class="count-pill">4 open</span></summary><p class="os-guess">OS guess: Linux 5.x</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>3306</td><td>tcp</td><td>mysql</td><td>MySQL 8.0</td></tr><tr><td>25</td><td>tcp</td><td>smtp</td><td>Postfix</td></tr><tr><td>6379</td><td>tcp</td><td>redis</td><td>Redis 7.2</td></tr><tr><td>443</td><td>tcp</td><td>https</td><td>nginx 1.24</td></tr></tbody></table></details><details class="host-block" data-filter="host7.example.com"><summary>host7.example.com <span class="count-pill">2 open</span></summary><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>21</td><td>tcp</td><td>ftp</td><td>vsftpd 3.0.5</td></tr><tr><td>8080</td><td>tcp</td><td>http-proxy</td><td>&mdash;</td></tr></tbody></table></details><details class="host-block" data-filter="host8.example.com"><summary>host8.example.com <span class="count-pill">2 open</span></summary><p class="os-guess">OS guess: Linux 5.x</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>3306</td><td>tcp</td><td>mysql</td><td>MySQL 8.0</td></tr><tr><td>8080</td><td>tcp</td><td>http-proxy</td><td>&mdash;</td></tr></tbody></table></details><details class="host-block" data-filter="host9.example.com"><summary>host9.example.com <span class="count-pill">1 open</span></summary><p class="os-guess">OS guess: Linux 5.x</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>21</td><td>tcp</td><td>ftp</td><td>vsftpd 3.0.5</td></tr></tbody></table></details><details class="host-block" data-filter="host10.example.com"><summary>host10.example.com <span class="count-pill">3 open</span></summary><p class="os-guess">OS guess: Linux 5.x</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>8080</td><td>tcp</td><td>http-proxy</td><td>&mdash;</td></tr><tr><td>6379</td><td>tcp</td><td>redis</td><td>Redis 7.2</td></tr><tr><td>21</td><td>tcp</td><td>ftp</td><td>vsftpd 3.0.5</td></tr></tbody></table></details><details class="host-block" data-filter="host11.example.com"><summary>host11.example.com <span class="count-pill">4 open</span></summary><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>53</td><td>udp</td><td>dns</td><td>BIND 9.18</td></tr><tr><td>80</td><td>tcp</td><td>http</td><td>nginx 1.24</td></tr><tr><td>3306</td><td>tcp</td><td>mysql</td><td>MySQL 8.0</td></tr><tr><td>22</td><td>tcp</td><td>ssh</td><td>OpenSSH 8.9</td></tr></tbody></table></details><details class="host-block" data-filter="host12.example.com"><summary>host12.example.com <span class="count-pill">3 open</span></summary><p class="os-guess">OS guess: Ubuntu 22.04</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>3306</td><td>tcp</td><td>mysql</td><td>MySQL 8.0</td></tr><tr><td>80</td><td>tcp</td><td>http</td><td>nginx 1.24</td></tr><tr><td>22</td><td>tcp</td><td>ssh</td><td>OpenSSH 8.9</td></tr></tbody></table></details><details class="host-block" data-filter="host13.example.com"><summary>host13.example.com <span class="count-pill">3 open</span></summary><p class="os-guess">OS guess: Linux 5.x</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>80</td><td>tcp</td><td>http</td><td>nginx 1.24</td></tr><tr><td>3306</td><td>tcp</td><td>mysql</td><td>MySQL 8.0</td></tr><tr><td>21</td><td>tcp</td><td>ftp</td><td>vsftpd 3.0.5</td></tr></tbody></table></details><details class="host-block" data-filter="host14.example.com"><summary>host14.example.com <span class="count-pill">4 open</span></summary><p class="os-guess">OS guess: Ubuntu 22.04</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>6379</td><td>tcp</td><td>redis</td><td>Redis 7.2</td></tr><tr><td>25</td><td>tcp</td><td>smtp</td><td>Postfix</td></tr><tr><td>8080</td><td>tcp</td><td>http-proxy</td><td>&mdash;</td></tr><tr><td>443</td><td>tcp</td><td>https</td><td>nginx 1.24</td></tr></tbody></table></details><details class="host-block" data-filter="host15.example.com"><summary>host15.example.com <span class="count-pill">3 open</span></summary><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>8080</td><td>tcp</td><td>http-proxy</td><td>&mdash;</td></tr><tr><td>3306</td><td>tcp</td><td>mysql</td><td>MySQL 8.0</td></tr><tr><td>53</td><td>udp</td><td>dns</td><td>BIND 9.18</td></tr></tbody></table></details><details class="host-block" data-filter="host16.example.com"><summary>host16.example.com <span class="count-pill">1 open</span></summary><p class="os-guess">OS guess: Ubuntu 22.04</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>443</td><td>tcp</td><td>https</td><td>nginx 1.24</td></tr></tbody></table></details><details class="host-block" data-filter="host17.example.com"><summary>host17.example.com <span class="count-pill">2 open</span></summary><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>25</td><td>tcp</td><td>smtp</td><td>Postfix</td></tr><tr><td>21</td><td>tcp</td><td>ftp</td><td>vsftpd 3.0.5</td></tr></tbody></table></details><details class="host-block" data-filter="host18.example.com"><summary>host18.example.com <span class="count-pill">2 open</span></summary><p class="os-guess">OS guess: Ubuntu 22.04</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>8080</td><td>tcp</td><td>http-proxy</td><td>&mdash;</td></tr><tr><td>22</td><td>tcp</td><td>ssh</td><td>OpenSSH 8.9</td></tr></tbody></table></details><details class="host-block" data-filter="host19.example.com"><summary>host19.example.com <span class="count-pill">1 open</span></summary><p class="os-guess">OS guess: Windows Server 2019</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>8080</td><td>tcp</td><td>http-proxy</td><td>&mdash;</td></tr></tbody></table></details><details class="host-block" data-filter="host20.example.com"><summary>host20.example.com <span class="count-pill">3 open</span></summary><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>80</td><td>tcp</td><td>http</td><td>nginx 1.24</td></tr><tr><td>3306</td><td>tcp</td><td>mysql</td><td>MySQL 8.0</td></tr><tr><td>6379</td><td>tcp</td><td>redis</td><td>Redis 7.2</td></tr></tbody></table></details><details class="host-block" data-filter="host21.example.com"><summary>host21.example.com <span class="count-pill">2 open</span></summary><p class="os-guess">OS guess: Windows Server 2019</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>25</td><td>tcp</td><td>smtp</td><td>Postfix</td></tr><tr><td>21</td><td>tcp</td><td>ftp</td><td>vsftpd 3.0.5</td></tr></tbody></table></details><details class="host-block" data-filter="host22.example.com"><summary>host22.example.com <span class="count-pill">2 open</span></summary><p class="os-guess">OS guess: Ubuntu 22.04</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>6379</td><td>tcp</td><td>redis</td><td>Redis 7.2</td></tr><tr><td>443</td><td>tcp</td><td>https</td><td>nginx 1.24</td></tr></tbody></table></details><details class="host-block" data-filter="host23.example.com"><summary>host23.example.com <span class="count-pill">3 open</span></summary><p class="os-guess">OS guess: Ubuntu 22.04</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>21</td><td>tcp</td><td>ftp</td><td>vsftpd 3.0.5</td></tr><tr><td>53</td><td>udp</td><td>dns</td><td>BIND 9.18</td></tr><tr><td>443</td><td>tcp</td><td>https</td><td>nginx 1.24</td></tr></tbody></table></details><details class="host-block" data-filter="host24.example.com"><summary>host24.example.com <span class="count-pill">2 open</span></summary><p class="os-guess">OS guess: Linux 5.x</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>53</td><td>udp</td><td>dns</td><td>BIND 9.18</td></tr><tr><td>25</td><td>tcp</td><td>smtp</td><td>Postfix</td></tr></tbody></table></details><details class="host-block" data-filter="host25.example.com"><summary>host25.example.com <span class="count-pill">1 open</span></summary><p class="os-guess">OS guess: Ubuntu 22.04</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>80</td><td>tcp</td><td>http</td><td>nginx 1.24</td></tr></tbody></table></details><details class="host-block" data-filter="admin.example.com"><summary>admin.example.com <span class="count-pill">2 open</span></summary><p class="os-guess">OS guess: Windows Server 2019</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>21</td><td>tcp</td><td>ftp</td><td>vsftpd 3.0.5</td></tr><tr><td>80</td><td>tcp</td><td>http</td><td>nginx 1.24</td></tr></tbody></table></details><details class="host-block" data-filter="vpn.example.com"><summary>vpn.example.com <span class="count-pill">4 open</span></summary><p class="os-guess">OS guess: Linux 5.x</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>25</td><td>tcp</td><td>smtp</td><td>Postfix</td></tr><tr><td>6379</td><td>tcp</td><td>redis</td><td>Redis 7.2</td></tr><tr><td>53</td><td>udp</td><td>dns</td><td>BIND 9.18</td></tr><tr><td>22</td><td>tcp</td><td>ssh</td><td>OpenSSH 8.9</td></tr></tbody></table></details><details class="host-block" data-filter="mail.example.com"><summary>mail.example.com <span class="count-pill">3 open</span></summary><p class="os-guess">OS guess: Windows Server 2019</p><table><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product / Version</th></tr></thead><tbody><tr><td>8080</td><td>tcp</td><td>http-proxy</td><td>&mdash;</td></tr><tr><td>80</td><td>tcp</td><td>http</td><td>nginx 1.24</td></tr><tr><td>443</td><td>tcp</td><td>https</td><td>nginx 1.24</td></tr></tbody></table></details></div>
+  </section>
+
+  <section id="js-findings">
+    <h2>// JavaScript Findings</h2>
+    <table><thead><tr><th>Source File</th><th>Endpoints</th><th>URLs</th><th>Possible Secrets</th></tr></thead><tbody><tr class="row-alert"><td><a href="https://portal.example.com/static/app.bundle.js" target="_blank" rel="noopener noreferrer">https://portal.example.com/static/app.bundle.js</a></td><td>3</td><td>1</td><td><span class="tag tag-danger">AWS_ACCESS_KEY</span></td></tr><tr class=""><td><a href="https://login.example.com/js/main.js" target="_blank" rel="noopener noreferrer">https://login.example.com/js/main.js</a></td><td>2</td><td>0</td><td><span class="tag tag-safe">none</span></td></tr></tbody></table>
+  </section>
+
+  <section id="screenshots">
+    <h2>// Screenshots (5)</h2>
+    <div class="slideshow">
+      <div class="slide-viewport">
+        <button class="slide-nav prev" onclick="changeSlide(-1)" aria-label="Previous screenshot">&#10094;</button>
+        <img id="slide-image" src="data:image/png;base64,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mMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAI1pOBdcypJ0786nFZnvXgDL1flmcTv3rcMaee2NODAADrqicDq2XQgKmnX1jWy+4v+/yZX+v+gk0Hb/b+MXvHzfVGrHXIN6ysl1NPv7Bl0IC36P0BgHDVnh4gwPOLn31+8bM9PQUAQIfeElibDt5s9LGHN7X0m3/b7LnX3rXRwP5jjjuiuf9Gy595vvOaz5/5tYdnPTD4fUPmXDN9yx232XzYNvfdMGPutXc1fusXJ5/WWNx348wtdti2uaV55mW3PDJ7fuNrm1v6HfCpCRsNHFCpVu64+NpnHlk84cRJC6bf88jsBaOPO/yphX957rGnVh9grdvdf8us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gGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACC/T8+VZKdkyDMggAAAABJRU5ErkJggg==" alt="admin.example.com">
+        <button class="slide-nav next" onclick="changeSlide(1)" aria-label="Next screenshot">&#10095;</button>
+        <div class="slide-counter"><span id="slide-index">1</span> / 5</div>
+      </div>
+      <div class="slide-caption" id="slide-caption">admin.example.com</div>
+      <div class="slide-dots" id="slide-dots"></div>
+    </div>
+  </section>
+
+  <footer>
+    Generated by Automated Recon Framework. For authorized security testing only.
+  </footer>
+
+</div>
+
+<script type="application/json" id="scan-data">{
+  "target": "example.com",
+  "scan_id": "scan-20260726-0142",
+  "duration_seconds": 1847.5,
+  "subdomains": [
+    "host1.example.com",
+    "host2.example.com",
+    "host3.example.com",
+    "host4.example.com",
+    "host5.example.com",
+    "host6.example.com",
+    "host7.example.com",
+    "host8.example.com",
+    "host9.example.com",
+    "host10.example.com",
+    "host11.example.com",
+    "host12.example.com",
+    "host13.example.com",
+    "host14.example.com",
+    "host15.example.com",
+    "host16.example.com",
+    "host17.example.com",
+    "host18.example.com",
+    "host19.example.com",
+    "host20.example.com",
+    "host21.example.com",
+    "host22.example.com",
+    "host23.example.com",
+    "host24.example.com",
+    "host25.example.com",
+    "host26.example.com",
+    "host27.example.com",
+    "host28.example.com",
+    "host29.example.com",
+    "host30.example.com",
+    "host31.example.com",
+    "host32.example.com",
+    "host33.example.com",
+    "host34.example.com",
+    "host35.example.com",
+    "host36.example.com",
+    "host37.example.com",
+    "host38.example.com",
+    "host39.example.com",
+    "host40.example.com",
+    "host41.example.com",
+    "host42.example.com",
+    "host43.example.com",
+    "host44.example.com",
+    "host45.example.com",
+    "host46.example.com",
+    "host47.example.com",
+    "host48.example.com",
+    "host49.example.com",
+    "host50.example.com",
+    "host51.example.com",
+    "host52.example.com",
+    "host53.example.com",
+    "host54.example.com",
+    "host55.example.com",
+    "host56.example.com",
+    "host57.example.com",
+    "host58.example.com",
+    "host59.example.com",
+    "host60.example.com",
+    "host61.example.com",
+    "host62.example.com",
+    "host63.example.com",
+    "host64.example.com",
+    "host65.example.com",
+    "host66.example.com",
+    "host67.example.com",
+    "host68.example.com",
+    "host69.example.com",
+    "host70.example.com",
+    "host71.example.com",
+    "host72.example.com",
+    "host73.example.com",
+    "host74.example.com",
+    "host75.example.com",
+    "host76.example.com",
+    "host77.example.com",
+    "host78.example.com",
+    "host79.example.com",
+    "host80.example.com",
+    "host81.example.com",
+    "host82.example.com",
+    "host83.example.com",
+    "host84.example.com",
+    "host85.example.com",
+    "host86.example.com",
+    "host87.example.com",
+    "host88.example.com",
+    "host89.example.com",
+    "host90.example.com",
+    "host91.example.com",
+    "host92.example.com",
+    "host93.example.com",
+    "host94.example.com",
+    "host95.example.com",
+    "host96.example.com",
+    "host97.example.com",
+    "host98.example.com",
+    "host99.example.com",
+    "host100.example.com",
+    "host101.example.com",
+    "host102.example.com",
+    "host103.example.com",
+    "host104.example.com",
+    "host105.example.com",
+    "host106.example.com",
+    "host107.example.com",
+    "host108.example.com",
+    "host109.example.com",
+    "host110.example.com",
+    "host111.example.com",
+    "host112.example.com",
+    "host113.example.com",
+    "host114.example.com",
+    "host115.example.com",
+    "host116.example.com",
+    "host117.example.com",
+    "host118.example.com",
+    "host119.example.com",
+    "host120.example.com",
+    "host121.example.com",
+    "host122.example.com",
+    "host123.example.com",
+    "host124.example.com",
+    "host125.example.com",
+    "host126.example.com",
+    "host127.example.com",
+    "host128.example.com",
+    "host129.example.com",
+    "host130.example.com",
+    "host131.example.com",
+    "host132.example.com",
+    "host133.example.com",
+    "host134.example.com",
+    "host135.example.com",
+    "host136.example.com",
+    "host137.example.com",
+    "host138.example.com",
+    "host139.example.com",
+    "admin.example.com",
+    "vpn.example.com",
+    "portal.example.com",
+    "mail.example.com",
+    "login.example.com"
+  ],
+  "alive_hosts": [
+    {
+      "url": "https://login.example.com",
+      "status_code": 200,
+      "title": "Login Portal",
+      "webserver": "nginx",
+      "technologies": [
+        "React",
+        "Node.js"
+      ]
+    },
+    {
+      "url": "https://admin.example.com",
+      "status_code": 401,
+      "title": "Admin Panel",
+      "webserver": "Apache",
+      "technologies": [
+        "PHP"
+      ]
+    },
+    {
+      "url": "https://portal.example.com",
+      "status_code": 200,
+      "title": "Customer Portal",
+      "webserver": "nginx",
+      "technologies": [
+        "Vue.js"
+      ]
+    },
+    {
+      "url": "https://vpn.example.com",
+      "status_code": 302,
+      "title": "",
+      "webserver": "OpenVPN-AS",
+      "technologies": []
+    },
+    {
+      "url": "https://mail.example.com",
+      "status_code": 200,
+      "title": "Webmail",
+      "webserver": "Postfix",
+      "technologies": [
+        "Roundcube"
+      ]
+    },
+    {
+      "url": "https://old-app.example.com",
+      "status_code": 500,
+      "title": "",
+      "webserver": "",
+      "technologies": []
+    }
+  ],
+  "port_results": [
+    {
+      "host": "host1.example.com",
+      "os_guess": "",
+      "ports": [
+        {
+          "port": 22,
+          "protocol": "tcp",
+          "service": "ssh",
+          "product": "OpenSSH",
+          "version": "8.9"
+        }
+      ]
+    },
+    {
+      "host": "host2.example.com",
+      "os_guess": "Linux 5.x",
+      "ports": [
+        {
+          "port": 3306,
+          "protocol": "tcp",
+          "service": "mysql",
+          "product": "MySQL",
+          "version": "8.0"
+        },
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "service": "https",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    },
+    {
+      "host": "host3.example.com",
+      "os_guess": "Linux 5.x",
+      "ports": [
+        {
+          "port": 21,
+          "protocol": "tcp",
+          "service": "ftp",
+          "product": "vsftpd",
+          "version": "3.0.5"
+        }
+      ]
+    },
+    {
+      "host": "host4.example.com",
+      "os_guess": "Ubuntu 22.04",
+      "ports": [
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "service": "http",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    },
+    {
+      "host": "host5.example.com",
+      "os_guess": "Ubuntu 22.04",
+      "ports": [
+        {
+          "port": 53,
+          "protocol": "udp",
+          "service": "dns",
+          "product": "BIND",
+          "version": "9.18"
+        },
+        {
+          "port": 22,
+          "protocol": "tcp",
+          "service": "ssh",
+          "product": "OpenSSH",
+          "version": "8.9"
+        }
+      ]
+    },
+    {
+      "host": "host6.example.com",
+      "os_guess": "Linux 5.x",
+      "ports": [
+        {
+          "port": 3306,
+          "protocol": "tcp",
+          "service": "mysql",
+          "product": "MySQL",
+          "version": "8.0"
+        },
+        {
+          "port": 25,
+          "protocol": "tcp",
+          "service": "smtp",
+          "product": "Postfix",
+          "version": ""
+        },
+        {
+          "port": 6379,
+          "protocol": "tcp",
+          "service": "redis",
+          "product": "Redis",
+          "version": "7.2"
+        },
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "service": "https",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    },
+    {
+      "host": "host7.example.com",
+      "os_guess": "",
+      "ports": [
+        {
+          "port": 21,
+          "protocol": "tcp",
+          "service": "ftp",
+          "product": "vsftpd",
+          "version": "3.0.5"
+        },
+        {
+          "port": 8080,
+          "protocol": "tcp",
+          "service": "http-proxy",
+          "product": "",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "host": "host8.example.com",
+      "os_guess": "Linux 5.x",
+      "ports": [
+        {
+          "port": 3306,
+          "protocol": "tcp",
+          "service": "mysql",
+          "product": "MySQL",
+          "version": "8.0"
+        },
+        {
+          "port": 8080,
+          "protocol": "tcp",
+          "service": "http-proxy",
+          "product": "",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "host": "host9.example.com",
+      "os_guess": "Linux 5.x",
+      "ports": [
+        {
+          "port": 21,
+          "protocol": "tcp",
+          "service": "ftp",
+          "product": "vsftpd",
+          "version": "3.0.5"
+        }
+      ]
+    },
+    {
+      "host": "host10.example.com",
+      "os_guess": "Linux 5.x",
+      "ports": [
+        {
+          "port": 8080,
+          "protocol": "tcp",
+          "service": "http-proxy",
+          "product": "",
+          "version": ""
+        },
+        {
+          "port": 6379,
+          "protocol": "tcp",
+          "service": "redis",
+          "product": "Redis",
+          "version": "7.2"
+        },
+        {
+          "port": 21,
+          "protocol": "tcp",
+          "service": "ftp",
+          "product": "vsftpd",
+          "version": "3.0.5"
+        }
+      ]
+    },
+    {
+      "host": "host11.example.com",
+      "os_guess": "",
+      "ports": [
+        {
+          "port": 53,
+          "protocol": "udp",
+          "service": "dns",
+          "product": "BIND",
+          "version": "9.18"
+        },
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "service": "http",
+          "product": "nginx",
+          "version": "1.24"
+        },
+        {
+          "port": 3306,
+          "protocol": "tcp",
+          "service": "mysql",
+          "product": "MySQL",
+          "version": "8.0"
+        },
+        {
+          "port": 22,
+          "protocol": "tcp",
+          "service": "ssh",
+          "product": "OpenSSH",
+          "version": "8.9"
+        }
+      ]
+    },
+    {
+      "host": "host12.example.com",
+      "os_guess": "Ubuntu 22.04",
+      "ports": [
+        {
+          "port": 3306,
+          "protocol": "tcp",
+          "service": "mysql",
+          "product": "MySQL",
+          "version": "8.0"
+        },
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "service": "http",
+          "product": "nginx",
+          "version": "1.24"
+        },
+        {
+          "port": 22,
+          "protocol": "tcp",
+          "service": "ssh",
+          "product": "OpenSSH",
+          "version": "8.9"
+        }
+      ]
+    },
+    {
+      "host": "host13.example.com",
+      "os_guess": "Linux 5.x",
+      "ports": [
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "service": "http",
+          "product": "nginx",
+          "version": "1.24"
+        },
+        {
+          "port": 3306,
+          "protocol": "tcp",
+          "service": "mysql",
+          "product": "MySQL",
+          "version": "8.0"
+        },
+        {
+          "port": 21,
+          "protocol": "tcp",
+          "service": "ftp",
+          "product": "vsftpd",
+          "version": "3.0.5"
+        }
+      ]
+    },
+    {
+      "host": "host14.example.com",
+      "os_guess": "Ubuntu 22.04",
+      "ports": [
+        {
+          "port": 6379,
+          "protocol": "tcp",
+          "service": "redis",
+          "product": "Redis",
+          "version": "7.2"
+        },
+        {
+          "port": 25,
+          "protocol": "tcp",
+          "service": "smtp",
+          "product": "Postfix",
+          "version": ""
+        },
+        {
+          "port": 8080,
+          "protocol": "tcp",
+          "service": "http-proxy",
+          "product": "",
+          "version": ""
+        },
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "service": "https",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    },
+    {
+      "host": "host15.example.com",
+      "os_guess": "",
+      "ports": [
+        {
+          "port": 8080,
+          "protocol": "tcp",
+          "service": "http-proxy",
+          "product": "",
+          "version": ""
+        },
+        {
+          "port": 3306,
+          "protocol": "tcp",
+          "service": "mysql",
+          "product": "MySQL",
+          "version": "8.0"
+        },
+        {
+          "port": 53,
+          "protocol": "udp",
+          "service": "dns",
+          "product": "BIND",
+          "version": "9.18"
+        }
+      ]
+    },
+    {
+      "host": "host16.example.com",
+      "os_guess": "Ubuntu 22.04",
+      "ports": [
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "service": "https",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    },
+    {
+      "host": "host17.example.com",
+      "os_guess": "",
+      "ports": [
+        {
+          "port": 25,
+          "protocol": "tcp",
+          "service": "smtp",
+          "product": "Postfix",
+          "version": ""
+        },
+        {
+          "port": 21,
+          "protocol": "tcp",
+          "service": "ftp",
+          "product": "vsftpd",
+          "version": "3.0.5"
+        }
+      ]
+    },
+    {
+      "host": "host18.example.com",
+      "os_guess": "Ubuntu 22.04",
+      "ports": [
+        {
+          "port": 8080,
+          "protocol": "tcp",
+          "service": "http-proxy",
+          "product": "",
+          "version": ""
+        },
+        {
+          "port": 22,
+          "protocol": "tcp",
+          "service": "ssh",
+          "product": "OpenSSH",
+          "version": "8.9"
+        }
+      ]
+    },
+    {
+      "host": "host19.example.com",
+      "os_guess": "Windows Server 2019",
+      "ports": [
+        {
+          "port": 8080,
+          "protocol": "tcp",
+          "service": "http-proxy",
+          "product": "",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "host": "host20.example.com",
+      "os_guess": "",
+      "ports": [
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "service": "http",
+          "product": "nginx",
+          "version": "1.24"
+        },
+        {
+          "port": 3306,
+          "protocol": "tcp",
+          "service": "mysql",
+          "product": "MySQL",
+          "version": "8.0"
+        },
+        {
+          "port": 6379,
+          "protocol": "tcp",
+          "service": "redis",
+          "product": "Redis",
+          "version": "7.2"
+        }
+      ]
+    },
+    {
+      "host": "host21.example.com",
+      "os_guess": "Windows Server 2019",
+      "ports": [
+        {
+          "port": 25,
+          "protocol": "tcp",
+          "service": "smtp",
+          "product": "Postfix",
+          "version": ""
+        },
+        {
+          "port": 21,
+          "protocol": "tcp",
+          "service": "ftp",
+          "product": "vsftpd",
+          "version": "3.0.5"
+        }
+      ]
+    },
+    {
+      "host": "host22.example.com",
+      "os_guess": "Ubuntu 22.04",
+      "ports": [
+        {
+          "port": 6379,
+          "protocol": "tcp",
+          "service": "redis",
+          "product": "Redis",
+          "version": "7.2"
+        },
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "service": "https",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    },
+    {
+      "host": "host23.example.com",
+      "os_guess": "Ubuntu 22.04",
+      "ports": [
+        {
+          "port": 21,
+          "protocol": "tcp",
+          "service": "ftp",
+          "product": "vsftpd",
+          "version": "3.0.5"
+        },
+        {
+          "port": 53,
+          "protocol": "udp",
+          "service": "dns",
+          "product": "BIND",
+          "version": "9.18"
+        },
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "service": "https",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    },
+    {
+      "host": "host24.example.com",
+      "os_guess": "Linux 5.x",
+      "ports": [
+        {
+          "port": 53,
+          "protocol": "udp",
+          "service": "dns",
+          "product": "BIND",
+          "version": "9.18"
+        },
+        {
+          "port": 25,
+          "protocol": "tcp",
+          "service": "smtp",
+          "product": "Postfix",
+          "version": ""
+        }
+      ]
+    },
+    {
+      "host": "host25.example.com",
+      "os_guess": "Ubuntu 22.04",
+      "ports": [
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "service": "http",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    },
+    {
+      "host": "admin.example.com",
+      "os_guess": "Windows Server 2019",
+      "ports": [
+        {
+          "port": 21,
+          "protocol": "tcp",
+          "service": "ftp",
+          "product": "vsftpd",
+          "version": "3.0.5"
+        },
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "service": "http",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    },
+    {
+      "host": "vpn.example.com",
+      "os_guess": "Linux 5.x",
+      "ports": [
+        {
+          "port": 25,
+          "protocol": "tcp",
+          "service": "smtp",
+          "product": "Postfix",
+          "version": ""
+        },
+        {
+          "port": 6379,
+          "protocol": "tcp",
+          "service": "redis",
+          "product": "Redis",
+          "version": "7.2"
+        },
+        {
+          "port": 53,
+          "protocol": "udp",
+          "service": "dns",
+          "product": "BIND",
+          "version": "9.18"
+        },
+        {
+          "port": 22,
+          "protocol": "tcp",
+          "service": "ssh",
+          "product": "OpenSSH",
+          "version": "8.9"
+        }
+      ]
+    },
+    {
+      "host": "mail.example.com",
+      "os_guess": "Windows Server 2019",
+      "ports": [
+        {
+          "port": 8080,
+          "protocol": "tcp",
+          "service": "http-proxy",
+          "product": "",
+          "version": ""
+        },
+        {
+          "port": 80,
+          "protocol": "tcp",
+          "service": "http",
+          "product": "nginx",
+          "version": "1.24"
+        },
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "service": "https",
+          "product": "nginx",
+          "version": "1.24"
+        }
+      ]
+    }
+  ],
+  "js_findings": [
+    {
+      "source_url": "https://portal.example.com/static/app.bundle.js",
+      "endpoints": [
+        "/api/v1/users",
+        "/api/v1/orders",
+        "/api/v1/auth"
+      ],
+      "urls": [
+        "https://cdn.example.com/lib.js"
+      ],
+      "secrets": {
+        "AWS_ACCESS_KEY": "AKIA...(redacted)"
+      }
+    },
+    {
+      "source_url": "https://login.example.com/js/main.js",
+      "endpoints": [
+        "/login",
+        "/logout"
+      ],
+      "urls": [],
+      "secrets": {}
+    }
+  ],
+  "screenshot_hosts": [
+    "login.example.com",
+    "admin.example.com",
+    "portal.example.com",
+    "vpn.example.com",
+    "mail.example.com"
+  ],
+  "statistics": {
+    "subdomains_found": 144,
+    "alive_hosts": 6,
+    "hosts_port_scanned": 28,
+    "open_ports_found": 64,
+    "js_files_analyzed": 2,
+    "possible_secrets_found": 1,
+    "screenshots_captured": 5
+  }
+}</script>
+<script type="application/json" id="screenshot-data">[{"name": "admin.example.com", "data_uri": "data:image/png;base64,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mMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAI1pOBdcypJ0786nFZnvXgDL1flmcTv3rcMaee2NODAADrqicDq2XQgKmnX1jWy+4v+/yZX+v+gk0Hb/b+MXvHzfVGrHXIN6ysl1NPv7Bl0IC36P0BgHDVnh4gwPOLn31+8bM9PQUAQIfeElibDt5s9LGHN7X0m3/b7LnX3rXRwP5jjjuiuf9Gy595vvOaz5/5tYdnPTD4fUPmXDN9yx232XzYNvfdMGPutXc1fusXJ5/WWNx348wtdti2uaV55mW3PDJ7fuNrm1v6HfCpCRsNHFCpVu64+NpnHlk84cRJC6bf88jsBaOPO/yphX957rGnVh9grdvdf8uszYdtncryhvOmLn/ub6+3S+P1fgNaxhx3eHP/jertxXXnTsnybOzxR9aam9paV914/rSXlr3QzV4AQJ/TWx5y3+2gEXf+8YYpp12w5/hRKaVRk8Y9NPP+KT86/5E5Cyq1jgqs1Kr33zxr6o9/deCnD7vn+hmX/fjCxsWry6uVlS+8NPX0C64+++L9Pzm+8/V9J3343utnTvuvX1937pQxxx6RUrpt8jX7HHnge7cbPGCTQQ9Ov6fLAN1vV6lWnn3sqSk/Ov/+W2aNOvqQbnZpGHX0uEV3PzD19AsXzpg3YuLoUZPGLZwxb8ppFyycMW/UpA+v49EAgL6it9zBmv6H63YcsduQPXas9WtOKQ3eachNF0xLKT02d2FZrzeuKcvymccWl/WyKIpnH32qLMtqU63L+2RZNv/2uSml5c8ubdqoufP1bd4/bNB7N22sq821LM9eWLr8wen3HnrSJy794S/XHKD77cqUHp49P6W06O77R00a180ujSfMtt5l+5suvDyltGD63IdnPfDJ73zpxvMvSyktmjlv5FEHrePRAIC+orcE1vgv/sPDf55/3w0zdxuzT0qpUq10/Eaepazj2wzr7UWjV4q29rJ87Ufj6+1F60sr13w9z/PLf/bboq09y7Itd9ym8T61fk31ol5rblpzgO63K+tlZ/YV7e3d75JSyrKOM5T1ctWK1pd/9aqx13o0AKCv6C0fEW42ZPBDd8+r1KqNtHr6oSe223OnlNLQ4Tuv109xWLNOGv309KK/DB2+c0pp2913GH7o/imljTd/99a7bH/lf1+0/6cOTVnXAbqXV/Ihu++YUhq2z65Pzn+08/U1d2ns/syjixvH2eWA4SOPOujJ+Y8O3XvXlNLQvXddvOCx9TkfANAH9JY7WPNuuvuor3/2uSeWtK5YWalW7vj9nw763MTdDxrx9KInivbizbzzhBMnTfvpb27/3Z9GH3vErqP3Luv1xqd1B37msDsvuf6vTyxZuvjZXfYf3mWA7jct2tqH7rXznuP3bX1pZeOjzGVLnt/rsP3W3KVz97HHH7nb2BGrVqy84byp1abamH888v2j92prbWt8VggAvJ1kg3bfsqf2PubUE19a/sJlP/nVWn8UVm/T+U2LG0CWZx/5yrEtAwdM/tbZG2ZHAOBN6sk7WIphXTR+0GhPTwEArIeevIMFAPC21FsecgcAeNsQWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAECwak9tvOyeE3pqa6DvGrTHz3t6BIC167HASv5HCawnfzED+gofEQIABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMF6b2Atv+P49bq+GLbJqqN3fWtmAQBYDz35bxHGqixaWlm0tKenAADoO4FVvqflpe+MTi219FJby7dvTmW54pQDy4HN2ZN/b99/m4EHXphSWn7H8QNHnd9YNF00rxi+Rfmu5ub/ubt2/aM9OzwA8I7SZwJrxb+NbLrqodq0hW1H7rjiKyNTWdauXlS74qG2g7ZrO2Ro16trebZ0Zf/PTqtvPfDF844QWADAhtR7n8HqohgxuHbNwyml2jUPFx8cXIwYXLv2kZRS7ebHs3rZ5eIyy5qmLEgp5U8sLwc0bfhpAYB3sj4TWF0aqqy9PHmeUtb14qytnv191QaYCgBgTX0msKozF7eN2z6l1DZu+8rMxdU5S9rGDkkptR28fblmYZVd72kBAGwwvfgZrFr+wgUfaSyrc5b0+8mdK74zetWkXdOKtpZv31w2VVZ8b+yqY3arzF2SrWjr2UkBAFbXewNr4IjzurzS/0tXda5XfndMv+/fVnnw+WK3zYoPbN7xJaPO77LosgYA2AB6b2B1r+m396385v5pZXuq5f2+e1tPjwMA8Iq+GliV+5/rf/xlPT0FAMBr6DMPuQMA9BUCCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBg1R7ce9k9J/Tg7gAAb5Fs0O5b9vQMAABvKz4iBAAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACC/T8+VZKdkyDMggAAAABJRU5ErkJggg=="}, {"name": "login.example.com", "data_uri": "data:image/png;base64,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AIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGD/D2y6Zl6fB87FAAAAAElFTkSuQmCC"}, {"name": "mail.example.com", "data_uri": "data:image/png;base64,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8q9a2r49pmxpyta0N3/uzlSmtm8eWe7UJ1+xuhg9uN97L0spvTbvzH77/0djUb3iieKQ3dKOfZq++2Dllt/19ukDAG8i20xgtX/l8Mr1S6rXLqqdPLz9y4ensqzcsKQ6c3ExfkjtuGEb7Fw25dlLr/U97bpyzx3X/nJiP4EFAGxBW+8zWBsoRg6q3rg0pVS9cWnxgUHFyEHVm5allCp3/CEV5YZ751nlVwtTStny1WnH5i1+sgDAm9o2E1gpy/7sZXPl9e1Zp33b69nq1nUvOtUXAMBmtc0EVuX+FbVjh6aUascOrcx5On/42WLcXimlYsKQDdsrpVRXVQBAr9l6n8Eqm/K1M05urCsPP9t00X1t3xpT++h+2Zpa8+fvSH2qrf86tv3jIypzn8vWtPfuqQIAdLT1BlbL8KkbbOnz8RvWr9u+M7b5/LvzBavq73lbcdCujY2NHyHsuNhgDQCwBWy9gdWz6rTH275+RLa2SM1585fv6u3TAQB43bYaWPkTf+x76nW9fRYAAF3YZh5yBwDYVggsAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIJVe3H2mic/04vTAQA2k6xlz116+xwAALYrviIEAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIL9L6vlICrEOjETAAAAAElFTkSuQmCC"}, {"name": "portal.example.com", "data_uri": "data:image/png;base64,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AACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgXRlY479w9fmfvjLLsy48Q/eU5dn5n75y/Beu7uqDAADvRVcGVp89+s24aWpZL9/D3uPOOrnD1ydcN/H/d6gdsPNmlfVyxk1T++zRbye9PwCwU/XUrwi3F1gAAF2u2tUH2GLCdROXP7hkn4P3T6m8b/LsWkvtjCvHNvRqaGlqmTd1zttvbphw3cRVS55c9/zLvfv1bmhsPPeayx+8Y+7pl49u7N17+UNLHpu3oM0b9urTe8SlZ/Xdo19ezX9x531rV68552MXrfjl48889uTp40eveer5dc+/1Gb7hOsmrlqyYv9DBy++9+F9hwza95ADlt6/aPOPtj7em6+u396U1td79+tz+vjRvfr0qRfFvT+ambKso9vpeBYA0KN1o0+wKtXK2ufW3PXtKcseXHzK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AQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEExgAQAEE1gAAMEEFgBAMIEFABBMYAEABBNYAADBBBYAQDCBBQAQTGABAAQTWAAAwQQWAEAwgQUAEOz/ABQambW4fkmTAAAAAElFTkSuQmCC"}, {"name": "vpn.example.com", "data_uri": "data:image/png;base64,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AAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIIJLACAYAILACCYwAIACCawAACCCSwAgGACCwAgmMACAAgmsAAAggksAIBgAgsAIJjAAgAIJrAAAIL9P3wNTKxPWb9zAAAAAElFTkSuQmCC"}]</script>
+<script>
+  function filterSubdomains(query) {
+    const q = query.trim().toLowerCase();
+    document.querySelectorAll('#subdomain-chips .chip').forEach(function (chip) {
+      const match = chip.getAttribute('data-filter').includes(q);
+      chip.style.display = match ? 'inline-block' : 'none';
+    });
+  }
+
+  function filterPorts(query) {
+    const q = query.trim().toLowerCase();
+    document.querySelectorAll('#port-panel .host-block').forEach(function (block) {
+      const match = block.getAttribute('data-filter').includes(q);
+      block.style.display = match ? 'block' : 'none';
+    });
+  }
+
+  function toggleAllDetails(state) {
+    document.querySelectorAll('#port-panel .host-block').forEach(function (d) { d.open = state; });
+  }
+
+  (function initSlideshow() {
+    const dataEl = document.getElementById('screenshot-data');
+    if (!dataEl) return;
+    let slides = [];
+    try { slides = JSON.parse(dataEl.textContent || '[]'); } catch (err) { slides = []; }
+    if (!slides.length) return;
+
+    let idx = 0;
+    const img = document.getElementById('slide-image');
+    const caption = document.getElementById('slide-caption');
+    const counter = document.getElementById('slide-index');
+    const dotsWrap = document.getElementById('slide-dots');
+
+    slides.forEach(function (_, i) {
+      const dot = document.createElement('button');
+      dot.className = 'dot';
+      dot.setAttribute('aria-label', 'Screenshot ' + (i + 1));
+      dot.onclick = function () { goToSlide(i); };
+      dotsWrap.appendChild(dot);
+    });
+
+    function render() {
+      img.src = slides[idx].data_uri;
+      img.alt = slides[idx].name;
+      caption.textContent = slides[idx].name;
+      counter.textContent = String(idx + 1);
+      document.querySelectorAll('#slide-dots .dot').forEach(function (d, i) {
+        d.classList.toggle('active', i === idx);
+      });
+    }
+
+    window.changeSlide = function (delta) {
+      idx = (idx + delta + slides.length) % slides.length;
+      render();
+    };
+    window.goToSlide = function (i) {
+      idx = i;
+      render();
+    };
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft') window.changeSlide(-1);
+      if (e.key === 'ArrowRight') window.changeSlide(1);
+    });
+
+    render();
+  })();
+</script>
+</body>
+</html>
