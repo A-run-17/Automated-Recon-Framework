@@ -85,7 +85,7 @@ reports/
 ## Project Structure
 
 ```
-Automated-Recon-Framework/
+Recon-Framework-CLI/
 ├── recon.py                # CLI entry point
 ├── config.py               # Central configuration
 ├── requirements.txt
