@@ -41,6 +41,7 @@ cd Automated-Recon-Framework
 
 # Install dependencies
 chmod +x install.sh
+./install.sh
 
 # Restart the terminal and Run the tool
 recon example.com
