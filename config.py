@@ -12,7 +12,7 @@ from pathlib import Path
 # Project root, resolved relative to this file so the framework works
 # regardless of the current working directory it is invoked from.
 BASE_DIR: Path = Path(__file__).resolve().parent
-REPORTS_DIR: Path = BASE_DIR / "reports"
+REPORTS_DIR: Path = Path.cwd() / "reports"
 TOOLS_DIR: Path = BASE_DIR / "tools"
 WORDLISTS_DIR: Path = TOOLS_DIR / "wordlists"
 
@@ -61,7 +61,7 @@ class Config:
     """
 
     timeout: int = 20
-    threads: int = 50
+    threads: int = 500
     reports_dir: Path = field(default_factory=lambda: REPORTS_DIR)
     tools_dir: Path = field(default_factory=lambda: TOOLS_DIR)
     wordlists_dir: Path = field(default_factory=lambda: WORDLISTS_DIR)
